@@ -14,10 +14,8 @@ class UploadResult {
 class ApiService {
   ApiService({String? baseUrl}) : baseUrl = baseUrl ?? _defaultBaseUrl;
 
-  /// TODO: point this at your deployed FastAPI instance.
-  /// Kept as a plain field (not const) so it can be overridden per-build
-  /// (e.g. via --dart-define) without touching this file.
-  static const String _defaultBaseUrl = 'https://your-fastapi-server.com';
+  /// ضع رابط الـ Cloudflare الناتج من Colab هنا
+  static const String _defaultBaseUrl = 'https://your-cloudflare-url.trycloudflare.com';
 
   final String baseUrl;
 
@@ -43,10 +41,10 @@ class ApiService {
         ..headers['User-Agent'] = _userAgent
         ..fields['speaker_id'] = speakerId
         ..fields['emotion'] = emotionTag
-        ..fields['reference_text'] = referenceText
+        ..fields['text'] = referenceText // تم التعديل لتطابق FastAPI
         ..files.add(
           await http.MultipartFile.fromPath(
-            'audio_file',
+            'file', // تم التعديل لتطابق FastAPI
             audioFile.path,
             filename: audioFile.uri.pathSegments.last,
           ),
