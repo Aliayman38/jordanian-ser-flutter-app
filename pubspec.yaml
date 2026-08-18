@@ -1,0 +1,24 @@
+name: jordanian_ser_app
+description: Crowdsourcing app for Jordanian Arabic emotional speech data (SER).
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2
+  record: ^5.1.2
+  path_provider: ^2.1.4
+  http: ^1.2.2
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
