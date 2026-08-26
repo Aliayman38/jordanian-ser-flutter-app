@@ -10,24 +10,34 @@ Flutter app for crowdsourcing Jordanian Arabic emotional speech samples.
 
 ## Project structure
 ```
+assets/
+  audio/        # Sound effects and reference audio
+  fonts/        # Custom typography (e.g. Tajawal)
+  icons/        # App icons & SVGs
+  images/       # Graphics & illustrations
 lib/
+  constants/    # ApiConstants (backend domain: https://serios.eqratech.com), AppConstants
   models/       # Emotion + Gender data
-  services/     # AppState (Provider), AudioService (record pkg), ApiService (http)
-  screens/      # The 3 main screens
+  screens/      # GenderSelection, EmotionsMenu, RecordingScreen
+  services/     # AppState (Provider), AudioService (record), ApiService (http)
+  theme/        # Centralized ThemeData & styling
+  utils/        # PermissionHelper & utilities
   widgets/      # EmotionCard, HoldToRecordButton
-  theme/        # Centralized ThemeData
+test/
+  unit/         # AppState & ApiService unit tests
+  widget_test.dart
 ```
 
-## Before you run it
+## Backend Configuration
 
-### 1. Point the app at your FastAPI backend
-Edit `lib/services/api_service.dart`:
+Backend server domain:
+```
+https://serios.eqratech.com
+```
+
+Configured in `lib/constants/api_constants.dart`:
 ```dart
-static const String _defaultBaseUrl = 'https://your-fastapi-server.com';
-```
-Or pass it at build time and read it via `String.fromEnvironment`:
-```bash
-flutter run --dart-define=API_BASE_URL=https://your-server.com
+static const String baseUrl = 'https://serios.eqratech.com';
 ```
 
 ### 2. Backend contract (`POST /api/submit-audio`)
