@@ -6,7 +6,8 @@ enum RecordingMode {
 }
 
 /// Dynamic microphone recording button supporting both "Hold to record"
-/// and "Tap to toggle" modes with multi-layer pulsating ripple rings.
+/// and "Tap to toggle" modes with multi-layer pulsating ripple rings,
+/// mouse hover states, and responsive styling.
 class HoldToRecordButton extends StatefulWidget {
   final VoidCallback onRecordStart;
   final VoidCallback onRecordStop;
@@ -36,6 +37,7 @@ class _HoldToRecordButtonState extends State<HoldToRecordButton>
   late final Animation<double> _pulseAnimation;
   late final Animation<double> _scaleAnimation;
   bool _internalPressed = false;
+  bool _isHovered = false;
 
   bool get _active => widget.isRecording || _internalPressed;
 
@@ -128,98 +130,103 @@ class _HoldToRecordButtonState extends State<HoldToRecordButton>
     final activeColor = _active ? const Color(0xFFE63946) : widget.color;
 
     return Center(
-      child: SizedBox(
-        width: 190,
-        height: 190,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Ripple layer 2 (outer)
-            AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, _) {
-                if (!_active) return const SizedBox.shrink();
-                final value = _pulseAnimation.value;
-                return Container(
-                  width: 130 + (60 * value),
-                  height: 130 + (60 * value),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: activeColor.withOpacity((1.0 - value) * 0.25),
-                  ),
-                );
-              },
-            ),
-
-            // Ripple layer 1 (inner)
-            AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, _) {
-                if (!_active) return const SizedBox.shrink();
-                final value = (_pulseAnimation.value + 0.5) % 1.0;
-                return Container(
-                  width: 130 + (40 * value),
-                  height: 130 + (40 * value),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: activeColor.withOpacity((1.0 - value) * 0.35),
-                  ),
-                );
-              },
-            ),
-
-            // Main Interactive Recording Button
-            GestureDetector(
-              onTapDown: widget.mode == RecordingMode.hold ? _handleHoldDown : null,
-              onTapUp: widget.mode == RecordingMode.hold ? _handleHoldUp : null,
-              onTapCancel: widget.mode == RecordingMode.hold ? _handleHoldCancel : null,
-              onTap: widget.mode == RecordingMode.tapToToggle ? _handleTapToggle : null,
-              child: ScaleTransition(
-                scale: _scaleAnimation,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOutCubic,
-                  width: _active ? 134 : 124,
-                  height: _active ? 134 : 124,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: _active
-                          ? [const Color(0xFFFF4D6D), const Color(0xFFC9184A)]
-                          : [widget.color, widget.color.withOpacity(0.85)],
+      child: MouseRegion(
+        cursor: widget.isBusy ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: SizedBox(
+          width: 190,
+          height: 190,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Ripple layer 2 (outer)
+              AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, _) {
+                  if (!_active) return const SizedBox.shrink();
+                  final value = _pulseAnimation.value;
+                  return Container(
+                    width: 130 + (60 * value),
+                    height: 130 + (60 * value),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: activeColor.withOpacity((1.0 - value) * 0.25),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: activeColor.withOpacity(_active ? 0.5 : 0.3),
-                        blurRadius: _active ? 28 : 16,
-                        offset: const Offset(0, 8),
-                        spreadRadius: _active ? 2 : 0,
+                  );
+                },
+              ),
+
+              // Ripple layer 1 (inner)
+              AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, _) {
+                  if (!_active) return const SizedBox.shrink();
+                  final value = (_pulseAnimation.value + 0.5) % 1.0;
+                  return Container(
+                    width: 130 + (40 * value),
+                    height: 130 + (40 * value),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: activeColor.withOpacity((1.0 - value) * 0.35),
+                    ),
+                  );
+                },
+              ),
+
+              // Main Interactive Recording Button
+              GestureDetector(
+                onTapDown: widget.mode == RecordingMode.hold ? _handleHoldDown : null,
+                onTapUp: widget.mode == RecordingMode.hold ? _handleHoldUp : null,
+                onTapCancel: widget.mode == RecordingMode.hold ? _handleHoldCancel : null,
+                onTap: widget.mode == RecordingMode.tapToToggle ? _handleTapToggle : null,
+                child: ScaleTransition(
+                  scale: _scaleAnimation,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    width: _active ? 136 : (_isHovered ? 130 : 124),
+                    height: _active ? 136 : (_isHovered ? 130 : 124),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: _active
+                            ? [const Color(0xFFFF4D6D), const Color(0xFFC9184A)]
+                            : [widget.color, widget.color.withOpacity(0.85)],
                       ),
-                    ],
-                  ),
-                  child: Center(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      transitionBuilder: (child, anim) =>
-                          ScaleTransition(scale: anim, child: child),
-                      child: Icon(
-                        _active
-                            ? (widget.mode == RecordingMode.tapToToggle
-                                ? Icons.stop_rounded
-                                : Icons.mic_rounded)
-                            : Icons.mic_none_rounded,
-                        key: ValueKey('${_active}_${widget.mode}'),
-                        color: Colors.white,
-                        size: _active ? 56 : 52,
+                      boxShadow: [
+                        BoxShadow(
+                          color: activeColor.withOpacity(_active ? 0.55 : (_isHovered ? 0.45 : 0.3)),
+                          blurRadius: _active ? 30 : (_isHovered ? 24 : 16),
+                          offset: Offset(0, _active ? 10 : (_isHovered ? 8 : 6)),
+                          spreadRadius: _active ? 2 : (_isHovered ? 1 : 0),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        transitionBuilder: (child, anim) =>
+                            ScaleTransition(scale: anim, child: child),
+                        child: Icon(
+                          _active
+                              ? (widget.mode == RecordingMode.tapToToggle
+                                  ? Icons.stop_rounded
+                                  : Icons.mic_rounded)
+                              : Icons.mic_none_rounded,
+                          key: ValueKey('${_active}_${widget.mode}'),
+                          color: Colors.white,
+                          size: _active ? 58 : 52,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

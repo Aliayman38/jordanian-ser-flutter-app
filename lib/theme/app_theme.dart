@@ -95,7 +95,7 @@ class AppTheme {
         brightness: Brightness.light,
       ),
       scaffoldBackgroundColor: background,
-      fontFamilyFallback: const ['Noto Sans Arabic', 'Roboto', 'Arial', 'sans-serif'],
+      fontFamilyFallback: const ['Cairo', 'Noto Sans Arabic', 'Roboto', 'Arial', 'sans-serif'],
     );
 
     return base.copyWith(

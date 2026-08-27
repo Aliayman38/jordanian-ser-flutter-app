@@ -1,6 +1,6 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jordanian_ser_app/constants/api_constants.dart';
+import 'package:jordanian_ser_app/models/audio_data.dart';
 import 'package:jordanian_ser_app/services/api_service.dart';
 
 void main() {
@@ -15,19 +15,22 @@ void main() {
       expect(service.baseUrl, equals('https://serios.eqratech.com'));
     });
 
-    test('submitAudio fails gracefully if file does not exist', () async {
+    test('submitAudio fails gracefully if AudioData is empty', () async {
       final service = ApiService();
-      final nonExistentFile = File('non_existent_file.wav');
+      final emptyAudio = AudioData(
+        bytes: Uint8List(0),
+        filename: 'empty.wav',
+      );
 
       final result = await service.submitAudio(
-        audioFile: nonExistentFile,
+        audioData: emptyAudio,
         speakerId: 'M1234',
         emotionTag: 'happy',
         referenceText: 'نص تجريبي',
       );
 
       expect(result.success, isFalse);
-      expect(result.errorMessage, equals('الملف الصوتي غير موجود.'));
+      expect(result.errorMessage, equals('الملف الصوتي فارغ أو غير صالح.'));
     });
   });
 }

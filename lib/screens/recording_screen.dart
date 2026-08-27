@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/emotion.dart';
 import '../services/api_service.dart';
@@ -16,7 +17,8 @@ import '../widgets/responsive_container.dart';
 enum _RecordingStage { idle, recording, uploading }
 
 /// Interactive recording screen: rotating Jordanian prompts, live frequency visualizer,
-/// elapsed timer, dual hold/tap modes, minimum duration protection, and gamified celebration.
+/// elapsed timer, dual hold/tap modes, minimum duration protection, gamified celebration,
+/// and responsive dual-pane layout with keyboard shortcuts for Web & Desktop.
 class RecordingScreen extends StatefulWidget {
   final EmotionData emotion;
   const RecordingScreen({super.key, required this.emotion});
@@ -28,6 +30,7 @@ class RecordingScreen extends StatefulWidget {
 class _RecordingScreenState extends State<RecordingScreen> {
   final AudioService _audioService = AudioService();
   final ApiService _apiService = ApiService();
+  final FocusNode _focusNode = FocusNode();
 
   late int _promptIndex;
   _RecordingStage _stage = _RecordingStage.idle;
@@ -49,13 +52,14 @@ class _RecordingScreenState extends State<RecordingScreen> {
   void dispose() {
     _timer?.cancel();
     _audioService.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   String get _currentPrompt => widget.emotion.promptFor(_promptIndex);
 
   void _shufflePrompt() {
-    if (_stage == _RecordingStage.recording) return;
+    if (_stage == _RecordingStage.recording || _stage == _RecordingStage.uploading) return;
     setState(() {
       _promptIndex = (_promptIndex + 1) % widget.emotion.prompts.length;
       _lastError = null;
@@ -117,10 +121,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
 
     // Minimum duration guard: at least 1000ms (1.0 second)
     if (recordDurationMs < 1000) {
-      final file = await _audioService.stopRecording();
-      if (file != null) {
-        unawaited(file.delete().catchError((_) => file));
-      }
+      await _audioService.stopRecording();
       if (!mounted) return;
       setState(() {
         _stage = _RecordingStage.idle;
@@ -131,8 +132,8 @@ class _RecordingScreenState extends State<RecordingScreen> {
 
     setState(() => _stage = _RecordingStage.uploading);
 
-    final file = await _audioService.stopRecording();
-    if (file == null) {
+    final audioData = await _audioService.stopRecording();
+    if (audioData == null || audioData.isEmpty) {
       if (!mounted) return;
       setState(() {
         _stage = _RecordingStage.idle;
@@ -143,14 +144,11 @@ class _RecordingScreenState extends State<RecordingScreen> {
 
     final appState = context.read<AppState>();
     final result = await _apiService.submitAudio(
-      audioFile: file,
+      audioData: audioData,
       speakerId: appState.speakerId,
       emotionTag: widget.emotion.apiTag,
       referenceText: _currentPrompt,
     );
-
-    // Best-effort local cleanup
-    unawaited(file.delete().catchError((_) => file));
 
     if (!mounted) return;
 
@@ -179,7 +177,8 @@ class _RecordingScreenState extends State<RecordingScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(28),
         ),
-        child: Padding(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 460),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -322,6 +321,142 @@ class _RecordingScreenState extends State<RecordingScreen> {
     final emotion = widget.emotion;
     final isRecording = _stage == _RecordingStage.recording;
     final isUploading = _stage == _RecordingStage.uploading;
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+
+    Widget promptSection = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Mode Selector Pill Switcher
+        _RecordingModeSelector(
+          currentMode: _recordingMode,
+          isBusy: isRecording || isUploading,
+          onModeChanged: (mode) {
+            setState(() => _recordingMode = mode);
+          },
+        ),
+
+        const SizedBox(height: 14),
+
+        // Target Jordanian Prompt Card with Shuffle Button
+        _PromptCard(
+          prompt: _currentPrompt,
+          emotion: emotion,
+          onShuffle: isRecording || isUploading ? null : _shufflePrompt,
+          promptNumber: _promptIndex + 1,
+          totalPrompts: emotion.prompts.length,
+          isDesktop: isDesktop,
+        ),
+
+        if (_lastError != null) ...[
+          const SizedBox(height: 12),
+          _ErrorBanner(message: _lastError!),
+        ],
+
+        if (_infoTip != null) ...[
+          const SizedBox(height: 12),
+          _InfoBanner(message: _infoTip!),
+        ],
+
+        if (isDesktop) ...[
+          const SizedBox(height: 14),
+          _KeyboardShortcutsCheatSheet(
+            isRecording: isRecording,
+            mode: _recordingMode,
+          ),
+        ],
+      ],
+    );
+
+    Widget recordingControlsSection = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Timer & Audio Frequency Waveform Visualizer
+        if (isRecording) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _formattedTimer,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.red.shade800,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Waveform Visualizer
+        AudioVisualizerWave(
+          isRecording: isRecording,
+          color: emotion.color,
+          secondaryColor: emotion.darkColor,
+        ),
+
+        const SizedBox(height: 18),
+
+        // Hold / Tap Record Button
+        if (isUploading)
+          const Column(
+            children: [
+              SizedBox(
+                width: 60,
+                height: 60,
+                child: CircularProgressIndicator(strokeWidth: 3.5),
+              ),
+              SizedBox(height: 16),
+            ],
+          )
+        else
+          HoldToRecordButton(
+            color: emotion.color,
+            isRecording: isRecording,
+            isBusy: isUploading,
+            mode: _recordingMode,
+            onRecordStart: _startRecording,
+            onRecordStop: _stopRecordingAndUpload,
+          ),
+
+        const SizedBox(height: 16),
+
+        // Status instruction text
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: Text(
+            _statusText,
+            key: ValueKey(_statusText),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: isRecording ? FontWeight.w700 : FontWeight.w500,
+              color: isRecording ? AppTheme.textDark : AppTheme.textMuted,
+            ),
+          ),
+        ),
+      ],
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -337,129 +472,135 @@ class _RecordingScreenState extends State<RecordingScreen> {
           ],
         ),
       ),
-      body: ResponsiveContainer(
-        child: Column(
-          children: [
-            // Mode Selector Pill Switcher
-            _RecordingModeSelector(
-              currentMode: _recordingMode,
-              isBusy: isRecording || isUploading,
-              onModeChanged: (mode) {
-                setState(() => _recordingMode = mode);
-              },
-            ),
-
-            const SizedBox(height: 14),
-
-            // Target Jordanian Prompt Card with Shuffle Button
-            _PromptCard(
-              prompt: _currentPrompt,
-              emotion: emotion,
-              onShuffle: isRecording || isUploading ? null : _shufflePrompt,
-              promptNumber: _promptIndex + 1,
-              totalPrompts: emotion.prompts.length,
-            ),
-
-            if (_lastError != null) ...[
-              const SizedBox(height: 12),
-              _ErrorBanner(message: _lastError!),
-            ],
-
-            if (_infoTip != null) ...[
-              const SizedBox(height: 12),
-              _InfoBanner(message: _infoTip!),
-            ],
-
-            const SizedBox(height: 16),
-
-            // Timer & Audio Frequency Waveform Visualizer
-            if (isRecording) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.red.shade200),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+      body: Focus(
+        focusNode: _focusNode,
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent) {
+            // Spacebar: start or toggle recording
+            if (event.logicalKey == LogicalKeyboardKey.space) {
+              if (_stage == _RecordingStage.idle) {
+                _startRecording();
+              } else if (_stage == _RecordingStage.recording) {
+                _stopRecordingAndUpload();
+              }
+              return KeyEventResult.handled;
+            }
+            // R / N: shuffle prompt
+            else if (event.logicalKey == LogicalKeyboardKey.keyR ||
+                event.logicalKey == LogicalKeyboardKey.keyN) {
+              _shufflePrompt();
+              return KeyEventResult.handled;
+            }
+            // Escape: back
+            else if (event.logicalKey == LogicalKeyboardKey.escape) {
+              Navigator.of(context).maybePop();
+              return KeyEventResult.handled;
+            }
+          }
+          return KeyEventResult.ignored;
+        },
+        child: ResponsiveContainer(
+          maxWidth: isDesktop ? 960 : 640,
+          wrapInCardOnDesktop: true,
+          child: isDesktop
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
+                    // Right pane (RTL): Prompt & Mode
+                    Expanded(
+                      flex: 5,
+                      child: promptSection,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _formattedTimer,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.red.shade800,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
+                    const SizedBox(width: 32),
+                    // Left pane (RTL): Recording Visualizer & Button
+                    Expanded(
+                      flex: 5,
+                      child: recordingControlsSection,
                     ),
                   ],
+                )
+              : Column(
+                  children: [
+                    promptSection,
+                    const SizedBox(height: 20),
+                    recordingControlsSection,
+                    const SizedBox(height: 16),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            // Waveform Visualizer
-            AudioVisualizerWave(
-              isRecording: isRecording,
-              color: emotion.color,
-              secondaryColor: emotion.darkColor,
-            ),
-
-            const SizedBox(height: 18),
-
-            // Hold / Tap Record Button
-            if (isUploading)
-              const Column(
-                children: [
-                  SizedBox(
-                    width: 60,
-                    height: 60,
-                    child: CircularProgressIndicator(strokeWidth: 3.5),
-                  ),
-                  SizedBox(height: 16),
-                ],
-              )
-            else
-              HoldToRecordButton(
-                color: emotion.color,
-                isRecording: isRecording,
-                isBusy: isUploading,
-                mode: _recordingMode,
-                onRecordStart: _startRecording,
-                onRecordStop: _stopRecordingAndUpload,
-              ),
-
-            const SizedBox(height: 16),
-
-            // Status instruction text
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Text(
-                _statusText,
-                key: ValueKey(_statusText),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: isRecording ? FontWeight.w700 : FontWeight.w500,
-                  color: isRecording ? AppTheme.textDark : AppTheme.textMuted,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-          ],
         ),
       ),
+    );
+  }
+}
+
+class _KeyboardShortcutsCheatSheet extends StatelessWidget {
+  final bool isRecording;
+  final RecordingMode mode;
+
+  const _KeyboardShortcutsCheatSheet({
+    required this.isRecording,
+    required this.mode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceElevated,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.borderLight),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildShortcut('Space', isRecording ? 'إيقاف وإرسال' : 'تسجيل'),
+          _buildShortcut('R', 'جملة جديدة'),
+          _buildShortcut('Esc', 'رجوع'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShortcut(String keyLabel, String actionLabel) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.borderLight, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Text(
+            keyLabel,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textDark,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          actionLabel,
+          style: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textMuted,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -517,22 +658,25 @@ class _ModeItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected ? Colors.white : AppTheme.textMuted,
+    return MouseRegion(
+      cursor: onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+              color: isSelected ? Colors.white : AppTheme.textMuted,
+            ),
           ),
         ),
       ),
@@ -546,6 +690,7 @@ class _PromptCard extends StatelessWidget {
   final VoidCallback? onShuffle;
   final int promptNumber;
   final int totalPrompts;
+  final bool isDesktop;
 
   const _PromptCard({
     required this.prompt,
@@ -553,6 +698,7 @@ class _PromptCard extends StatelessWidget {
     required this.onShuffle,
     required this.promptNumber,
     required this.totalPrompts,
+    this.isDesktop = false,
   });
 
   @override
@@ -619,9 +765,9 @@ class _PromptCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   ),
                   icon: const Icon(Icons.shuffle_rounded, size: 16),
-                  label: const Text(
-                    'جملة ثانية',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                  label: Text(
+                    isDesktop ? 'جملة ثانية (R)' : 'جملة ثانية',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
                   ),
                   onPressed: onShuffle,
                 ),
@@ -716,6 +862,3 @@ class _InfoBanner extends StatelessWidget {
     );
   }
 }
-
-/// Small helper so we can fire-and-forget a Future without a lint warning.
-void unawaited(Future<void> future) {}

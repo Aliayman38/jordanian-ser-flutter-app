@@ -8,7 +8,8 @@ import '../widgets/emotion_card.dart';
 import '../widgets/responsive_container.dart';
 import 'recording_screen.dart';
 
-/// Dashboard: live score, contributor level tiers, and responsive grid of emotions.
+/// Dashboard: live score, contributor level tiers, and responsive grid of emotions
+/// optimized for Mobile, Tablet, and Desktop Web.
 class EmotionsMenuScreen extends StatelessWidget {
   const EmotionsMenuScreen({super.key});
 
@@ -92,6 +93,7 @@ class EmotionsMenuScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final score = appState.score;
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -106,6 +108,7 @@ class EmotionsMenuScreen extends StatelessWidget {
         ],
       ),
       body: ResponsiveContainer(
+        maxWidth: isDesktop ? 1080 : 720,
         scrollable: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -131,22 +134,27 @@ class EmotionsMenuScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Responsive Emotions Grid
+            // Responsive Emotions Grid (Adapts from 2 to 5 columns)
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final width = constraints.maxWidth;
-                  final crossAxisCount = width > 700
-                      ? 4
-                      : width > 480
-                          ? 3
-                          : 2;
+                  final int crossAxisCount;
+                  final double childAspectRatio;
 
-                  final childAspectRatio = width > 700
-                      ? 1.05
-                      : width > 480
-                          ? 0.95
-                          : 0.85;
+                  if (width > 1000) {
+                    crossAxisCount = 5;
+                    childAspectRatio = 1.08;
+                  } else if (width > 750) {
+                    crossAxisCount = 4;
+                    childAspectRatio = 1.02;
+                  } else if (width > 500) {
+                    crossAxisCount = 3;
+                    childAspectRatio = 0.95;
+                  } else {
+                    crossAxisCount = 2;
+                    childAspectRatio = 0.88;
+                  }
 
                   return GridView.count(
                     crossAxisCount: crossAxisCount,

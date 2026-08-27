@@ -1,7 +1,6 @@
-import 'dart:io';
 import 'package:http/http.dart' as http;
-
 import '../constants/api_constants.dart';
+import '../models/audio_data.dart';
 
 /// Result of an upload attempt, surfaced to the UI layer.
 class UploadResult {
@@ -12,7 +11,8 @@ class UploadResult {
   const UploadResult.fail(this.errorMessage) : success = false;
 }
 
-/// Handles all communication with the FastAPI data-collection backend.
+/// Handles all communication with the FastAPI data-collection backend
+/// across Web, Android, iOS, and Desktop platforms.
 class ApiService {
   ApiService({String? baseUrl})
       : baseUrl = _normalizeUrl(baseUrl ?? ApiConstants.baseUrl);
@@ -23,17 +23,15 @@ class ApiService {
     return url.endsWith('/') ? url.substring(0, url.length - 1) : url;
   }
 
-  /// Uploads a recorded WAV file plus metadata to `/api/submit-audio`.
-  ///
-  /// [audioFile] must be a valid, existing WAV file on disk.
+  /// Uploads recorded WAV audio bytes plus metadata to `/api/submit-audio`.
   Future<UploadResult> submitAudio({
-    required File audioFile,
+    required AudioData audioData,
     required String speakerId,
     required String emotionTag,
     required String referenceText,
   }) async {
-    if (!await audioFile.exists()) {
-      return const UploadResult.fail('الملف الصوتي غير موجود.');
+    if (audioData.isEmpty) {
+      return const UploadResult.fail('الملف الصوتي فارغ أو غير صالح.');
     }
 
     final uri = Uri.parse('$baseUrl${ApiConstants.submitAudioEndpoint}');
@@ -43,12 +41,12 @@ class ApiService {
         ..headers['User-Agent'] = ApiConstants.userAgent
         ..fields['speaker_id'] = speakerId
         ..fields['emotion'] = emotionTag
-        ..fields['text'] = referenceText // تم التعديل لتطابق FastAPI
+        ..fields['text'] = referenceText
         ..files.add(
-          await http.MultipartFile.fromPath(
-            'file', // تم التعديل لتطابق FastAPI
-            audioFile.path,
-            filename: audioFile.uri.pathSegments.last,
+          http.MultipartFile.fromBytes(
+            'file',
+            audioData.bytes,
+            filename: audioData.filename,
           ),
         );
 
@@ -63,8 +61,8 @@ class ApiService {
       return UploadResult.fail(
         'فشل الرفع (رمز الخطأ: ${response.statusCode}).',
       );
-    } on SocketException {
-      return const UploadResult.fail('تأكد من الاتصال بالإنترنت وحاول مرة ثانية.');
+    } on http.ClientException {
+      return const UploadResult.fail('تعذر الاتصال بالخادم. تأكد من اتصالك بالإنترنت وصحة الرابط.');
     } catch (e) {
       return UploadResult.fail('صار خطأ غير متوقع: $e');
     }

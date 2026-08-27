@@ -1,10 +1,9 @@
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import '../models/audio_data.dart';
+import 'audio_io.dart' as audio_io;
 
-/// Thin wrapper around the `record` package configured for SER data
-/// collection: mono, 16kHz, 16-bit PCM WAV — a common format for speech
-/// model pipelines (matches typical wav2vec2 / whisper front-ends).
+/// Cross-platform wrapper around the `record` package configured for SER data
+/// collection: mono, 16kHz, WAV — compatible with both Mobile (Android/iOS) and Web.
 class AudioService {
   final AudioRecorder _recorder = AudioRecorder();
 
@@ -19,37 +18,55 @@ class AudioService {
   bool get isRecording => _isRecording;
 
   /// Checks (and, if needed, requests) microphone permission.
-  Future<bool> hasPermission() => _recorder.hasPermission();
+  Future<bool> hasPermission() async {
+    try {
+      return await _recorder.hasPermission();
+    } catch (_) {
+      return false;
+    }
+  }
 
-  /// Starts recording to a fresh temp WAV file. Returns the file path used.
+  /// Starts recording. Returns the target path or empty string on web.
   Future<String> startRecording() async {
     final granted = await hasPermission();
     if (!granted) {
       throw const RecordingPermissionException(
-        'صلاحية الميكروفون مرفوضة. فعّلها من إعدادات الجهاز.',
+        'صلاحية الميكروفون مرفوضة. يرجى السماح بالوصول للميكروفون من إعدادات المتصفح أو الجهاز.',
       );
     }
 
-    final dir = await getTemporaryDirectory();
-    final path =
-        '${dir.path}/ser_${DateTime.now().millisecondsSinceEpoch}.wav';
-
+    final path = await audio_io.getTempAudioPath();
     await _recorder.start(_config, path: path);
     _isRecording = true;
     return path;
   }
 
-  /// Stops the current recording and returns the resulting [File], or
-  /// `null` if nothing was recorded.
-  Future<File?> stopRecording() async {
-    final path = await _recorder.stop();
+  /// Stops the current recording and returns the cross-platform [AudioData],
+  /// or `null` if nothing was recorded.
+  Future<AudioData?> stopRecording() async {
+    final pathOrUrl = await _recorder.stop();
     _isRecording = false;
-    if (path == null) return null;
-    final file = File(path);
-    return file.existsSync() ? file : null;
+    if (pathOrUrl == null) return null;
+
+    final bytes = await audio_io.readAudioBytes(pathOrUrl);
+    if (bytes == null || bytes.isEmpty) return null;
+
+    final filename = 'ser_${DateTime.now().millisecondsSinceEpoch}.wav';
+    return AudioData(
+      bytes: bytes,
+      filename: filename,
+      mimeType: 'audio/wav',
+    );
   }
 
-  /// Cancels an in-progress recording and discards the file.
+  /// Discards the recorded audio resource.
+  Future<void> discardAudio(String? pathOrUrl) async {
+    if (pathOrUrl != null && pathOrUrl.isNotEmpty) {
+      await audio_io.deleteAudioFile(pathOrUrl);
+    }
+  }
+
+  /// Cancels an in-progress recording and discards the stream/file.
   Future<void> cancelRecording() async {
     if (_isRecording) {
       await _recorder.cancel();
