@@ -1,163 +1,96 @@
-import 'package:flutter/material.dart';
+export class AppTheme {
+  static primary = '#006D5B';
+  static primaryLight = '#0A8754';
+  static primaryDark = '#004D40';
+  static primaryContainer = '#E6F4F1';
 
-class AppTheme {
-  // Brand palette - Modern Jordanian Emerald, Jade, Warm Amber & Jewel Tones
-  static const Color primary = Color(0xFF006D5B); // Emerald Teal
-  static const Color primaryLight = Color(0xFF0A8754); // Rich Jade
-  static const Color primaryDark = Color(0xFF004D40); // Deep Teal
-  static const Color primaryContainer = Color(0xFFE6F4F1);
-  
-  static const Color accent = Color(0xFFFFB703); // Warm Jordanian Amber
-  static const Color accentLight = Color(0xFFFFD166);
-  static const Color accentOrange = Color(0xFFFB8500); // Sunset Orange
-  
-  static const Color coralRed = Color(0xFFE63946);
-  static const Color royalIndigo = Color(0xFF3F51B5);
-  static const Color softSlate = Color(0xFF607771);
+  static accent = '#FFB703';
+  static accentLight = '#FFD166';
+  static accentOrange = '#FB8500';
 
-  static const Color background = Color(0xFFF6FAF8);
-  static const Color surface = Colors.white;
-  static const Color surfaceElevated = Color(0xFFFAFCFB);
-  
-  static const Color textDark = Color(0xFF102A24);
-  static const Color textMuted = Color(0xFF536E67);
-  static const Color textLight = Color(0xFF8BA6A0);
-  
-  static const Color borderLight = Color(0xFFE2EBE8);
+  static coralRed = '#E63946';
+  static royalIndigo = '#3F51B5';
+  static softSlate = '#607771';
 
-  // Gradients
-  static const LinearGradient primaryGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [primary, primaryLight],
-  );
+  static background = '#F6FAF8';
+  static surface = '#FFFFFF';
+  static surfaceElevated = '#FAFCFB';
 
-  static const LinearGradient heroGradient = LinearGradient(
-    begin: Alignment.topRight,
-    end: Alignment.bottomLeft,
-    colors: [Color(0xFF006D5B), Color(0xFF064E41)],
-  );
+  static textDark = '#102A24';
+  static textMuted = '#536E67';
+  static textLight = '#8BA6A0';
 
-  static const LinearGradient amberGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFFFFB703), Color(0xFFFB8500)],
-  );
+  static borderLight = '#E2EBE8';
 
-  // Card & Ambient Shadows
-  static List<BoxShadow> get cardShadow => [
-        BoxShadow(
-          color: const Color(0xFF102A24).withOpacity(0.06),
-          blurRadius: 20,
-          offset: const Offset(0, 8),
-          spreadRadius: -2,
-        ),
-        BoxShadow(
-          color: const Color(0xFF102A24).withOpacity(0.03),
-          blurRadius: 6,
-          offset: const Offset(0, 2),
-        ),
-      ];
+  static primaryGradient = 'linear-gradient(to bottom right, #006D5B, #0A8754)';
+  static heroGradient = 'linear-gradient(to bottom left, #006D5B, #064E41)';
+  static amberGradient = 'linear-gradient(to bottom right, #FFB703, #FB8500)';
 
-  static List<BoxShadow> glowShadow(Color color, {double opacity = 0.35, double blur = 22}) => [
-        BoxShadow(
-          color: color.withOpacity(opacity),
-          blurRadius: blur,
-          offset: const Offset(0, 8),
-        ),
-      ];
+  static cardShadow = '0 8px 20px -2px rgba(16, 42, 36, 0.06), 0 2px 6px 0 rgba(16, 42, 36, 0.03)';
 
-  static BoxDecoration glassDecoration({
-    Color? color,
-    BorderRadius? borderRadius,
-    Color? borderColor,
-  }) {
-    return BoxDecoration(
-      color: color ?? surface.withOpacity(0.85),
-      borderRadius: borderRadius ?? BorderRadius.circular(24),
-      border: Border.all(
-        color: borderColor ?? Colors.white.withOpacity(0.4),
-        width: 1.5,
-      ),
-      boxShadow: cardShadow,
-    );
+  static glowShadow(color, opacity = 0.35, blur = 22) {
+    const hexOpacity = Math.round(opacity * 255)
+      .toString(16)
+      .padStart(2, '0');
+    return `0 8px ${blur}px ${color.startsWith('#') ? color + hexOpacity : color}`;
   }
 
-  static ThemeData get theme {
-    final base = ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: primary,
-        primary: primary,
-        secondary: primaryLight,
-        tertiary: accent,
-        surface: surface,
-        brightness: Brightness.light,
-      ),
-      scaffoldBackgroundColor: background,
-      fontFamilyFallback: const ['Cairo', 'Noto Sans Arabic', 'Roboto', 'Arial', 'sans-serif'],
-    );
-
-    return base.copyWith(
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
-        foregroundColor: textDark,
-        elevation: 0,
-        centerTitle: true,
-        scrolledUnderElevation: 0,
-        titleTextStyle: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: textDark,
-        ),
-      ),
-      cardTheme: CardTheme(
-        color: surface,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: borderLight, width: 1.2),
-        ),
-      ),
-      dialogTheme: DialogTheme(
-        backgroundColor: surface,
-        elevation: 12,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primary,
-          foregroundColor: Colors.white,
-          elevation: 3,
-          shadowColor: primary.withOpacity(0.4),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: primary,
-          side: const BorderSide(color: primary, width: 1.5),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-      ),
-    );
+  static glassDecoration({ color, borderRadius = 24, borderColor } = {}) {
+    return {
+      backgroundColor: color || 'rgba(255, 255, 255, 0.85)',
+      borderRadius: typeof borderRadius === 'number' ? `${borderRadius}px` : borderRadius,
+      border: `1.5px solid ${borderColor || 'rgba(255, 255, 255, 0.4)'}`,
+      boxShadow: AppTheme.cardShadow,
+    };
   }
+
+  static theme = {
+    colorScheme: {
+      primary: AppTheme.primary,
+      secondary: AppTheme.primaryLight,
+      tertiary: AppTheme.accent,
+      surface: AppTheme.surface,
+      background: AppTheme.background,
+    },
+    scaffoldBackgroundColor: AppTheme.background,
+    fontFamily: ['Cairo', 'Noto Sans Arabic', 'Roboto', 'Arial', 'sans-serif'].join(', '),
+    appBar: {
+      backgroundColor: 'transparent',
+      color: AppTheme.textDark,
+      textAlign: 'center',
+      fontSize: 20,
+      fontWeight: 700,
+    },
+    card: {
+      backgroundColor: AppTheme.surface,
+      borderRadius: 24,
+      border: `1.2px solid ${AppTheme.borderLight}`,
+    },
+    dialog: {
+      backgroundColor: AppTheme.surface,
+      borderRadius: 28,
+      boxShadow: '0 12px 24px rgba(0, 0, 0, 0.15)',
+    },
+    elevatedButton: {
+      backgroundColor: AppTheme.primary,
+      color: '#FFFFFF',
+      boxShadow: `0 3px 8px ${AppTheme.primary}66`,
+      padding: '14px 24px',
+      fontSize: 16,
+      fontWeight: 700,
+      borderRadius: 18,
+      border: 'none',
+      cursor: 'pointer',
+    },
+    outlinedButton: {
+      backgroundColor: 'transparent',
+      color: AppTheme.primary,
+      border: `1.5px solid ${AppTheme.primary}`,
+      padding: '14px 24px',
+      fontSize: 15,
+      fontWeight: 700,
+      borderRadius: 16,
+      cursor: 'pointer',
+    },
+  };
 }
