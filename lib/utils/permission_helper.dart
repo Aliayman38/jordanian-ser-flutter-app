@@ -1,26 +1,33 @@
-import 'package:permission_handler/permission_handler.dart';
-
-/// Helper utility to request and check device permissions
-class PermissionHelper {
-  PermissionHelper._();
-
-  /// Requests microphone permission and returns true if granted
-  static Future<bool> requestMicrophonePermission() async {
-    final status = await Permission.microphone.status;
-    if (status.isGranted) {
+export class PermissionHelper {
+  static async requestMicrophonePermission() {
+    try {
+      if (navigator?.permissions?.query) {
+        const status = await navigator.permissions.query({ name: 'microphone' });
+        if (status.state === 'granted') {
+          return true;
+        }
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
       return true;
+    } catch (_) {
+      return false;
     }
-    final result = await Permission.microphone.request();
-    return result.isGranted;
   }
 
-  /// Checks if microphone permission is granted
-  static Future<bool> isMicrophoneGranted() async {
-    return Permission.microphone.isGranted;
+  static async isMicrophoneGranted() {
+    try {
+      if (navigator?.permissions?.query) {
+        const status = await navigator.permissions.query({ name: 'microphone' });
+        return status.state === 'granted';
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
   }
 
-  /// Opens app settings if permission is permanently denied
-  static Future<bool> openSettings() async {
-    return openAppSettings();
+  static async openSettings() {
+    return false;
   }
 }
