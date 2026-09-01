@@ -1,23 +1,22 @@
-import 'dart:typed_data';
-import 'package:http/http.dart' as http;
-
-Future<Uint8List?> readAudioBytes(String pathOrBlobUrl) async {
+export async function readAudioBytes(pathOrBlobUrl) {
   try {
     if (pathOrBlobUrl.startsWith('blob:') || pathOrBlobUrl.startsWith('http')) {
-      final response = await http.get(Uri.parse(pathOrBlobUrl));
-      if (response.statusCode == 200) {
-        return response.bodyBytes;
+      const response = await fetch(pathOrBlobUrl);
+      if (response.status === 200) {
+        const arrayBuffer = await response.arrayBuffer();
+        return new Uint8Array(arrayBuffer);
       }
     }
   } catch (_) {}
   return null;
 }
 
-Future<void> deleteAudioFile(String pathOrBlobUrl) async {
-  // Browser memory blobs are automatically garbage collected.
+export async function deleteAudioFile(pathOrBlobUrl) {
+  if (pathOrBlobUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(pathOrBlobUrl);
+  }
 }
 
-Future<String> getTempAudioPath() async {
-  // On Flutter web, record package creates a blob URL and does not require a local file path.
+export async function getTempAudioPath() {
   return '';
 }
