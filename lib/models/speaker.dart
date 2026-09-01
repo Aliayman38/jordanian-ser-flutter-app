@@ -1,12 +1,22 @@
-import 'package:flutter/material.dart';
+export const Gender = Object.freeze({
+  male: 'male',
+  female: 'female',
+});
 
-/// Speaker gender, used to build the `speaker_id` sent to the backend.
-enum Gender { male, female }
-
-extension GenderX on Gender {
-  String get label => this == Gender.male ? 'شاب' : 'صبية';
-  String get formalLabel => this == Gender.male ? 'ذكر' : 'أنثى';
-  String get description => this == Gender.male ? 'صوت رجالي' : 'صوت نسائي';
-  IconData get icon => this == Gender.male ? Icons.male_rounded : Icons.female_rounded;
-  String get apiValue => this == Gender.male ? 'male' : 'female';
-}
+export const GenderX = {
+  label(gender) {
+    return gender === Gender.male ? 'شاب' : 'صبية';
+  },
+  formalLabel(gender) {
+    return gender === Gender.male ? 'ذكر' : 'أنثى';
+  },
+  description(gender) {
+    return gender === Gender.male ? 'صوت رجالي' : 'صوت نسائي';
+  },
+  icon(gender) {
+    return gender === Gender.male ? 'male' : 'female';
+  },
+  apiValue(gender) {
+    return gender === Gender.male ? 'male' : 'female';
+  },
+};
