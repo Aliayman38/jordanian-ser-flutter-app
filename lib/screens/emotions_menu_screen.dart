@@ -1,375 +1,473 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../models/emotion.dart';
-import '../models/speaker.dart';
-import '../services/app_state.dart';
-import '../theme/app_theme.dart';
-import '../widgets/emotion_card.dart';
-import '../widgets/responsive_container.dart';
-import 'recording_screen.dart';
+import React, { useState, useEffect, useRef } from 'react';
+import { EmotionData } from '../models/emotion';
+import { Gender, GenderX } from '../models/speaker';
+import { useAppState } from '../services/app_state';
+import { AppTheme } from '../theme/app_theme';
+import { EmotionCard } from '../widgets/emotion_card';
+import { ResponsiveContainer } from '../widgets/responsive_container';
+import { RecordingScreen } from './recording_screen';
 
-/// Dashboard: live score, contributor level tiers, and responsive grid of emotions
-/// optimized for Mobile, Tablet, and Desktop Web.
-class EmotionsMenuScreen extends StatelessWidget {
-  const EmotionsMenuScreen({super.key});
+function ChangeGenderDialog({ isOpen, onClose }) {
+  const { speakerId, gender, selectGender } = useAppState();
 
-  void _showChangeGenderDialog(BuildContext context) {
-    final appState = context.read<AppState>();
+  if (!isOpen) return null;
 
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Row(
-          children: [
-            Icon(Icons.tune_rounded, color: AppTheme.primary),
-            SizedBox(width: 10),
-            Text(
-              'تغيير إعدادات الجلسة',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'المعرّف الحالي: ${appState.speakerId} (${appState.gender?.label ?? ""})',
-              style: const TextStyle(fontSize: 14, color: AppTheme.textMuted),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'اختر الصوت المناسب لتسجيلاتك القادمة:',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: appState.gender == Gender.male
-                          ? AppTheme.primary.withOpacity(0.1)
-                          : null,
-                    ),
-                    onPressed: () {
-                      appState.selectGender(Gender.male);
-                      Navigator.of(dialogCtx).pop();
-                    },
-                    child: const Text('شاب 👨'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: appState.gender == Gender.female
-                          ? AppTheme.primary.withOpacity(0.1)
-                          : null,
-                    ),
-                    onPressed: () {
-                      appState.selectGender(Gender.female);
-                      Navigator.of(dialogCtx).pop();
-                    },
-                    child: const Text('صبية 👩'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('إلغاء'),
-          ),
-        ],
-      ),
-    );
-  }
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          backgroundColor: '#fff',
+          borderRadius: 24,
+          padding: 24,
+          maxWidth: 400,
+          width: '90%',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+          <span
+            className="material-icons-round"
+            style={{ color: AppTheme.primary, marginRight: 10, fontSize: 24 }}
+          >
+            tune
+          </span>
+          <span style={{ fontSize: 18, fontWeight: 800 }}>تغيير إعدادات الجلسة</span>
+        </div>
 
-  @override
-  Widget build(BuildContext context) {
-    final appState = context.watch<AppState>();
-    final score = appState.score;
-    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'start' }}>
+          <span style={{ fontSize: 14, color: AppTheme.textMuted }}>
+            {`المعرّف الحالي: ${speakerId} (${gender ? GenderX.label(gender) : ''})`}
+          </span>
+          <div style={{ height: 16 }} />
+          <span style={{ fontSize: 14, fontWeight: 700 }}>
+            اختر الصوت المناسب لتسجيلاتك القادمة:
+          </span>
+          <div style={{ height: 12 }} />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              type="button"
+              style={{
+                flex: 1,
+                padding: '10px 16px',
+                borderRadius: 8,
+                border: `1px solid ${AppTheme.primary}`,
+                backgroundColor:
+                  gender === Gender.male
+                    ? 'rgba(230, 57, 70, 0.1)'
+                    : 'transparent',
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+              onClick={() => {
+                selectGender(Gender.male);
+                onClose();
+              }}
+            >
+              شاب 👨
+            </button>
+            <button
+              type="button"
+              style={{
+                flex: 1,
+                padding: '10px 16px',
+                borderRadius: 8,
+                border: `1px solid ${AppTheme.primary}`,
+                backgroundColor:
+                  gender === Gender.female
+                    ? 'rgba(230, 57, 70, 0.1)'
+                    : 'transparent',
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+              onClick={() => {
+                selectGender(Gender.female);
+                onClose();
+              }}
+            >
+              صبية 👩
+            </button>
+          </div>
+        </div>
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('اختر الشعور'),
-        actions: [
-          IconButton(
-            tooltip: 'تغيير المتحدث',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => _showChangeGenderDialog(context),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: ResponsiveContainer(
-        maxWidth: isDesktop ? 1080 : 720,
-        scrollable: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Gamified Score & Level Tier Banner
-            _GamifiedTierBanner(score: score, speakerId: appState.speakerId),
-            const SizedBox(height: 16),
-
-            // Instruction subtitle
-            const Row(
-              children: [
-                Icon(Icons.mic_external_on_rounded, size: 18, color: AppTheme.primary),
-                SizedBox(width: 6),
-                Text(
-                  'اختر شعوراً لتسجيل عبارة أردنية معبرة:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textMuted,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Responsive Emotions Grid (Adapts from 2 to 5 columns)
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.maxWidth;
-                  final int crossAxisCount;
-                  final double childAspectRatio;
-
-                  if (width > 1000) {
-                    crossAxisCount = 5;
-                    childAspectRatio = 1.08;
-                  } else if (width > 750) {
-                    crossAxisCount = 4;
-                    childAspectRatio = 1.02;
-                  } else if (width > 500) {
-                    crossAxisCount = 3;
-                    childAspectRatio = 0.95;
-                  } else {
-                    crossAxisCount = 2;
-                    childAspectRatio = 0.88;
-                  }
-
-                  return GridView.count(
-                    crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 14,
-                    childAspectRatio: childAspectRatio,
-                    physics: const BouncingScrollPhysics(),
-                    children: EmotionData.all.values.map((data) {
-                      return EmotionCard(
-                        data: data,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => RecordingScreen(emotion: data),
-                            ),
-                          );
-                        },
-                      );
-                    }).toList(),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginTop: 24,
+          }}
+        >
+          <button
+            type="button"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: AppTheme.primary,
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: 14,
+            }}
+            onClick={onClose}
+          >
+            إلغاء
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-class _GamifiedTierBanner extends StatelessWidget {
-  final int score;
-  final String speakerId;
-
-  const _GamifiedTierBanner({required this.score, required this.speakerId});
-
-  ({String title, String badge, int target, double progress}) _getTierInfo(int score) {
-    if (score == 0) {
-      return (
+function GamifiedTierBanner({ score, speakerId }) {
+  const getTierInfo = (score) => {
+    if (score === 0) {
+      return {
         title: 'مساهم جديد',
         badge: '🎯',
         target: 1,
         progress: 0.0,
-      );
+      };
     } else if (score < 4) {
-      return (
+      return {
         title: 'مساهم مبتدئ',
         badge: '🥉',
         target: 4,
         progress: score / 4,
-      );
+      };
     } else if (score < 10) {
-      return (
+      return {
         title: 'مساهم برونزي',
         badge: '🥈',
         target: 10,
         progress: (score - 3) / 7,
-      );
+      };
     } else if (score < 20) {
-      return (
+      return {
         title: 'مساهم ذهبي',
         badge: '🥇',
         target: 20,
         progress: (score - 9) / 11,
-      );
+      };
     } else {
-      return (
+      return {
         title: 'بطل اللهجة الأردنية',
         badge: '🌟',
         target: score,
         progress: 1.0,
-      );
+      };
     }
+  };
+
+  const tier = getTierInfo(score);
+  const clampedProgress = Math.min(Math.max(tier.progress, 0.05), 1.0);
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: 18,
+        background: AppTheme.heroGradient,
+        borderRadius: 24,
+        boxShadow: `0 8px 20px ${AppTheme.primaryDark}4D`,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <span style={{ fontSize: 22 }}>{tier.badge}</span>
+          </div>
+          <div style={{ width: 12 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <span
+              style={{
+                color: '#ffffff',
+                fontSize: 16,
+                fontWeight: 900,
+              }}
+            >
+              {tier.title}
+            </span>
+            <div style={{ height: 2 }} />
+            <span
+              style={{
+                color: 'rgba(255, 255, 255, 0.75)',
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              {`المعرّف: ${speakerId}`}
+            </span>
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: '8px 14px',
+            backgroundColor: AppTheme.accent,
+            borderRadius: 16,
+            boxShadow: `0 4px 10px rgba(255, 227, 168, 0.4)`,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <span
+            className="material-icons-round"
+            style={{
+              color: AppTheme.textDark,
+              fontSize: 20,
+            }}
+          >
+            graphic_eq
+          </span>
+          <div style={{ width: 6 }} />
+          <span
+            key={score}
+            style={{
+              color: AppTheme.textDark,
+              fontSize: 20,
+              fontWeight: 900,
+              transition: 'transform 250ms ease-in-out',
+            }}
+          >
+            {score}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ height: 14 }} />
+
+      <div
+        style={{
+          borderRadius: 10,
+          overflow: 'hidden',
+          backgroundColor: 'rgba(255, 255, 255, 0.15)',
+          height: 8,
+          width: '100%',
+        }}
+      >
+        <div
+          style={{
+            width: `${clampedProgress * 100}%`,
+            height: '100%',
+            backgroundColor: AppTheme.accent,
+            transition: 'width 300ms ease',
+          }}
+        />
+      </div>
+
+      <div style={{ height: 6 }} />
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <span
+          style={{
+            color: 'rgba(255, 255, 255, 0.8)',
+            fontSize: 11.5,
+            fontWeight: 600,
+          }}
+        >
+          {score >= 20
+            ? 'أعلى رتبة محققة! أسطورة 🌟'
+            : `سجل ${tier.target - score} مقاطع إضافية للرتبة التالية`}
+        </span>
+        <span
+          style={{
+            color: 'rgba(255, 255, 255, 0.85)',
+            fontSize: 11.5,
+            fontWeight: 700,
+          }}
+        >
+          {score >= 20 ? '100%' : `${score} / ${tier.target}`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function EmotionsMenuScreen({ navigate }) {
+  const appState = useAppState();
+  const { score, speakerId } = appState;
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const gridContainerRef = useRef(null);
+
+  useEffect(() => {
+    if (!gridContainerRef.current) return;
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    resizeObserver.observe(gridContainerRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  let crossAxisCount = 2;
+  if (containerWidth > 1000) {
+    crossAxisCount = 5;
+  } else if (containerWidth > 750) {
+    crossAxisCount = 4;
+  } else if (containerWidth > 500) {
+    crossAxisCount = 3;
+  } else {
+    crossAxisCount = 2;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final tier = _getTierInfo(score);
+  const isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 1024 : false;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: AppTheme.heroGradient,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: AppTheme.glowShadow(AppTheme.primaryDark, opacity: 0.3, blur: 20),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Tier Badge & Name
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(tier.badge, style: const TextStyle(fontSize: 22)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tier.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'المعرّف: $speakerId',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.75),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        width: '100vw',
+        overflow: 'hidden',
+        backgroundColor: '#fafafa',
+      }}
+    >
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 16px',
+          height: 56,
+          backgroundColor: '#ffffff',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        }}
+      >
+        <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>اختر الشعور</h1>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <button
+            type="button"
+            title="تغيير المتحدث"
+            onClick={() => setDialogOpen(true)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <span className="material-icons-round" style={{ fontSize: 24 }}>
+              settings
+            </span>
+          </button>
+          <div style={{ width: 8 }} />
+        </div>
+      </header>
 
-              // Total Score Chip
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppTheme.accent,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.accent.withOpacity(0.4),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.graphic_eq_rounded,
-                      color: AppTheme.textDark,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 6),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 250),
-                      transitionBuilder: (child, anim) =>
-                          ScaleTransition(scale: anim, child: child),
-                      child: Text(
-                        '$score',
-                        key: ValueKey(score),
-                        style: const TextStyle(
-                          color: AppTheme.textDark,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+      <ResponsiveContainer
+        maxWidth={isDesktop ? 1080 : 720}
+        scrollable={false}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            width: '100%',
+          }}
+        >
+          <GamifiedTierBanner score={score} speakerId={speakerId} />
+          <div style={{ height: 16 }} />
 
-          const SizedBox(height: 14),
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <span
+              className="material-icons-round"
+              style={{ fontSize: 18, color: AppTheme.primary }}
+            >
+              mic_external_on
+            </span>
+            <div style={{ width: 6 }} />
+            <span
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: AppTheme.textMuted,
+              }}
+            >
+              اختر شعوراً لتسجيل عبارة أردنية معبرة:
+            </span>
+          </div>
+          <div style={{ height: 12 }} />
 
-          // Tier Progress Bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: tier.progress.clamp(0.05, 1.0),
-              minHeight: 8,
-              backgroundColor: Colors.white.withOpacity(0.15),
-              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.accent),
-            ),
-          ),
+          <div
+            ref={gridContainerRef}
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              minHeight: 0,
+            }}
+          >
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${crossAxisCount}, 1fr)`,
+                gap: 14,
+                paddingBottom: 16,
+              }}
+            >
+              {Object.values(EmotionData.all).map((data) => (
+                <EmotionCard
+                  key={data.type}
+                  data={data}
+                  onTap={() => {
+                    if (navigate) {
+                      navigate(<RecordingScreen emotion={data} />);
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </ResponsiveContainer>
 
-          const SizedBox(height: 6),
-
-          // Next Level hint
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                score >= 20
-                    ? 'أعلى رتبة محققة! أسطورة 🌟'
-                    : 'سجل ${tier.target - score} مقاطع إضافية للرتبة التالية',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Text(
-                score >= 20 ? '100%' : '$score / ${tier.target}',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.85),
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+      <ChangeGenderDialog
+        isOpen={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+      />
+    </div>
+  );
 }
