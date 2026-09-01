@@ -1,419 +1,411 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import '../models/speaker.dart';
-import '../services/app_state.dart';
-import '../theme/app_theme.dart';
-import '../widgets/responsive_container.dart';
-import 'emotions_menu_screen.dart';
+import React, { useState, useEffect, useRef } from 'react';
+import { Gender, GenderX } from '../models/speaker';
+import { useAppState } from '../services/app_state';
+import { AppTheme } from '../theme/app_theme';
+import { ResponsiveContainer } from '../widgets/responsive_container';
+import { EmotionsMenuScreen } from './emotions_menu_screen';
 
-/// First screen: contributor selects gender, previews their anonymous contributor ID,
-/// and starts the Jordanian SER voice collection challenge.
-/// Fully responsive for Web, Desktop, Tablet, and Mobile.
-class GenderSelectionScreen extends StatefulWidget {
-  const GenderSelectionScreen({super.key});
-
-  @override
-  State<GenderSelectionScreen> createState() => _GenderSelectionScreenState();
-}
-
-class _GenderSelectionScreenState extends State<GenderSelectionScreen> {
-  final FocusNode _focusNode = FocusNode();
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  void _onStart(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const EmotionsMenuScreen(),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final appState = context.watch<AppState>();
-    final selected = appState.gender;
-    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
-
-    return Scaffold(
-      body: Focus(
-        focusNode: _focusNode,
-        autofocus: true,
-        onKeyEvent: (node, event) {
-          if (event is KeyDownEvent) {
-            if (event.logicalKey == LogicalKeyboardKey.digit1 ||
-                event.logicalKey == LogicalKeyboardKey.numpad1) {
-              appState.selectGender(Gender.male);
-              return KeyEventResult.handled;
-            } else if (event.logicalKey == LogicalKeyboardKey.digit2 ||
-                event.logicalKey == LogicalKeyboardKey.numpad2) {
-              appState.selectGender(Gender.female);
-              return KeyEventResult.handled;
-            } else if ((event.logicalKey == LogicalKeyboardKey.enter ||
-                    event.logicalKey == LogicalKeyboardKey.space) &&
-                selected != null) {
-              _onStart(context);
-              return KeyEventResult.handled;
-            }
-          }
-          return KeyEventResult.ignored;
-        },
-        child: ResponsiveContainer(
-          maxWidth: isDesktop ? 600 : 520,
-          wrapInCardOnDesktop: true,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const SizedBox(height: 8),
-
-              // Jordanian AI Project Pill Badge (Wrap to prevent overflow on small containers)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: AppTheme.primary.withOpacity(0.2),
-                  ),
-                ),
-                child: const Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 6,
-                  children: [
-                    Text('🇯🇴', style: TextStyle(fontSize: 15)),
-                    Text(
-                      'المشروع الوطني للذكاء الاصطناعي الأردني',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-              const _HeaderArt(),
-              const SizedBox(height: 14),
-
-              // Title
-              const Text(
-                'تحدي الصوت الأردني',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: AppTheme.textDark,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const SizedBox(height: 6),
-
-              // Description
-              const Text(
-                'ساعدنا في تدريب أول نموذج ذكاء اصطناعي يفهم المشاعر باللهجة الأردنية بدقة عالية ✨\nاختر جنس المتحدث للبدء:',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppTheme.textMuted,
-                  height: 1.5,
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Gender Selection Cards
-              Row(
-                children: [
-                  Expanded(
-                    child: _GenderCard(
-                      icon: Gender.male.icon,
-                      label: Gender.male.label,
-                      sublabel: Gender.male.description,
-                      shortcutHint: isDesktop ? '1' : null,
-                      isSelected: selected == Gender.male,
-                      onTap: () => appState.selectGender(Gender.male),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _GenderCard(
-                      icon: Gender.female.icon,
-                      label: Gender.female.label,
-                      sublabel: Gender.female.description,
-                      shortcutHint: isDesktop ? '2' : null,
-                      isSelected: selected == Gender.female,
-                      onTap: () => appState.selectGender(Gender.female),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // Live Contributor ID Preview Badge
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: selected != null
-                    ? Container(
-                        key: ValueKey(appState.speakerId),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppTheme.borderLight),
-                          boxShadow: AppTheme.cardShadow,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.fingerprint_rounded,
-                              size: 18,
-                              color: AppTheme.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'معرّف المساهم: ${appState.speakerId}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textDark,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : const SizedBox(height: 38),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Start Challenge Action Button
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: selected != null
-                    ? SizedBox(
-                        key: const ValueKey('start-btn'),
-                        width: double.infinity,
-                        height: 54,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.play_arrow_rounded, size: 24),
-                          label: const Text(
-                            'ابدأ التحدي 🚀',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          onPressed: () => _onStart(context),
-                        ),
-                      )
-                    : const SizedBox(key: ValueKey('empty'), height: 54),
-              ),
-
-              const SizedBox(height: 12),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderArt extends StatelessWidget {
-  const _HeaderArt();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 84,
-      height: 84,
-      decoration: BoxDecoration(
-        gradient: AppTheme.primaryGradient,
-        shape: BoxShape.circle,
-        boxShadow: AppTheme.glowShadow(AppTheme.primary, opacity: 0.35, blur: 24),
-      ),
-      child: Center(
-        child: Container(
+function HeaderArt() {
+  return (
+    <div
+      style={{
+        width: 84,
+        height: 84,
+        borderRadius: '50%',
+        background: AppTheme.primaryGradient,
+        boxShadow: `0 8px 24px ${AppTheme.primary}59`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        style={{
           width: 72,
           height: 72,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.18),
-            shape: BoxShape.circle,
-          ),
-          child: const Center(
-            child: Text('🎙️', style: TextStyle(fontSize: 38)),
-          ),
-        ),
-      ),
-    );
-  }
+          borderRadius: '50%',
+          backgroundColor: 'rgba(255, 255, 255, 0.18)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <span style={{ fontSize: 38 }}>🎙️</span>
+      </div>
+    </div>
+  );
 }
 
-class _GenderCard extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final String sublabel;
-  final String? shortcutHint;
-  final bool isSelected;
-  final VoidCallback onTap;
+function GenderCard({
+  icon,
+  label,
+  sublabel,
+  shortcutHint,
+  isSelected,
+  onTap,
+}) {
+  const [isHovered, setIsHovered] = useState(false);
 
-  const _GenderCard({
-    required this.icon,
-    required this.label,
-    required this.sublabel,
-    this.shortcutHint,
-    required this.isSelected,
-    required this.onTap,
-  });
+  return (
+    <div
+      onClick={onTap}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        cursor: 'pointer',
+        borderRadius: 22,
+        padding: '18px 12px',
+        backgroundColor: isSelected ? AppTheme.primary : AppTheme.surface,
+        border: `${isSelected ? '2.2px' : isHovered ? '1.8px' : '1.2px'} solid ${
+          isSelected
+            ? AppTheme.primary
+            : isHovered
+            ? `${AppTheme.primary}80`
+            : AppTheme.borderLight
+        }`,
+        boxShadow: isSelected
+          ? `0 8px 18px ${AppTheme.primary}52`
+          : isHovered
+          ? `0 6px 16px ${AppTheme.primary}1F`
+          : AppTheme.cardShadow,
+        transform: isHovered ? 'translateY(-3px)' : 'translateY(0px)',
+        transition: 'all 220ms cubic-bezier(0.215, 0.61, 0.355, 1)',
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        userSelect: 'none',
+      }}
+    >
+      {isSelected && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -8,
+            left: -2,
+            padding: 4,
+            backgroundColor: AppTheme.accent,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <span
+            className="material-icons-round"
+            style={{ fontSize: 14, color: AppTheme.textDark }}
+          >
+            check
+          </span>
+        </div>
+      )}
 
-  @override
-  State<_GenderCard> createState() => _GenderCardState();
+      {shortcutHint && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -8,
+            right: -2,
+            padding: '2px 6px',
+            backgroundColor: isSelected
+              ? 'rgba(255, 255, 255, 0.2)'
+              : AppTheme.borderLight,
+            borderRadius: 6,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 'bold',
+              color: isSelected ? '#ffffff' : AppTheme.textMuted,
+            }}
+          >
+            {shortcutHint}
+          </span>
+        </div>
+      )}
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <span
+          className="material-icons-round"
+          style={{
+            fontSize: 42,
+            color: isSelected ? '#ffffff' : AppTheme.primary,
+          }}
+        >
+          {icon}
+        </span>
+        <div style={{ height: 8 }} />
+        <span
+          style={{
+            fontSize: 17,
+            fontWeight: 900,
+            color: isSelected ? '#ffffff' : AppTheme.textDark,
+          }}
+        >
+          {label}
+        </span>
+        <div style={{ height: 2 }} />
+        <span
+          style={{
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: isSelected ? 'rgba(255, 255, 255, 0.85)' : AppTheme.textMuted,
+          }}
+        >
+          {sublabel}
+        </span>
+      </div>
+    </div>
+  );
 }
 
-class _GenderCardState extends State<_GenderCard> {
-  bool _isHovered = false;
+export function GenderSelectionScreen({ navigate }) {
+  const appState = useAppState();
+  const selected = appState.gender;
+  const containerRef = useRef(null);
 
-  @override
-  Widget build(BuildContext context) {
-    final isSelected = widget.isSelected;
+  const isDesktop =
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : false;
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          transform: _isHovered
-              ? (Matrix4.identity()..translate(0.0, -3.0, 0.0))
-              : Matrix4.identity(),
-          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? AppTheme.primary : AppTheme.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: isSelected
-                  ? AppTheme.primary
-                  : (_isHovered
-                      ? AppTheme.primary.withOpacity(0.5)
-                      : AppTheme.borderLight),
-              width: isSelected ? 2.2 : (_isHovered ? 1.8 : 1.2),
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: AppTheme.primary.withOpacity(0.32),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                  ]
-                : (_isHovered
-                    ? [
-                        BoxShadow(
-                          color: AppTheme.primary.withOpacity(0.12),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ]
-                    : AppTheme.cardShadow),
-          ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              // Selected checkmark indicator
-              if (isSelected)
-                Positioned(
-                  top: -8,
-                  left: -2,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: AppTheme.accent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check_rounded,
-                      size: 14,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                ),
+  const onStart = () => {
+    if (navigate) {
+      navigate(<EmotionsMenuScreen />);
+    }
+  };
 
-              // Keyboard shortcut badge
-              if (widget.shortcutHint != null)
-                Positioned(
-                  top: -8,
-                  right: -2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.white.withOpacity(0.2)
-                          : AppTheme.borderLight,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      widget.shortcutHint!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : AppTheme.textMuted,
-                      ),
-                    ),
-                  ),
-                ),
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === '1') {
+        appState.selectGender(Gender.male);
+      } else if (event.key === '2') {
+        appState.selectGender(Gender.female);
+      } else if (
+        (event.key === 'Enter' || event.key === ' ') &&
+        selected !== null &&
+        selected !== undefined
+      ) {
+        onStart();
+      }
+    };
 
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    widget.icon,
-                    size: 42,
-                    color: isSelected ? Colors.white : AppTheme.primary,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.label,
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      color: isSelected ? Colors.white : AppTheme.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.sublabel,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? Colors.white.withOpacity(0.85)
-                          : AppTheme.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selected, appState]);
+
+  return (
+    <div
+      ref={containerRef}
+      tabIndex={0}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+        width: '100vw',
+        outline: 'none',
+      }}
+    >
+      <ResponsiveContainer
+        maxWidth={isDesktop ? 600 : 520}
+        wrapInCardOnDesktop={true}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+          }}
+        >
+          <div style={{ height: 8 }} />
+
+          <div
+            style={{
+              padding: '6px 14px',
+              backgroundColor: `${AppTheme.primary}14`,
+              borderRadius: 30,
+              border: `1px solid ${AppTheme.primary}33`,
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <span style={{ fontSize: 15 }}>🇯🇴</span>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: AppTheme.primary,
+              }}
+            >
+              المشروع الوطني للذكاء الاصطناعي الأردني
+            </span>
+          </div>
+
+          <div style={{ height: 16 }} />
+          <HeaderArt />
+          <div style={{ height: 14 }} />
+
+          <h1
+            style={{
+              fontSize: 26,
+              fontWeight: 900,
+              color: AppTheme.textDark,
+              letterSpacing: -0.3,
+              textAlign: 'center',
+              margin: 0,
+            }}
+          >
+            تحدي الصوت الأردني
+          </h1>
+          <div style={{ height: 6 }} />
+
+          <p
+            style={{
+              fontSize: 14,
+              color: AppTheme.textMuted,
+              lineHeight: 1.5,
+              textAlign: 'center',
+              margin: 0,
+              whiteSpace: 'pre-line',
+            }}
+          >
+            {'ساعدنا في تدريب أول نموذج ذكاء اصطناعي يفهم المشاعر باللهجة الأردنية بدقة عالية ✨\nاختر جنس المتحدث للبدء:'}
+          </p>
+
+          <div style={{ height: 24 }} />
+
+          <div
+            style={{
+              display: 'flex',
+              width: '100%',
+              gap: 12,
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <GenderCard
+                icon={GenderX.icon(Gender.male)}
+                label={GenderX.label(Gender.male)}
+                sublabel={GenderX.description(Gender.male)}
+                shortcutHint={isDesktop ? '1' : null}
+                isSelected={selected === Gender.male}
+                onTap={() => appState.selectGender(Gender.male)}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <GenderCard
+                icon={GenderX.icon(Gender.female)}
+                label={GenderX.label(Gender.female)}
+                sublabel={GenderX.description(Gender.female)}
+                shortcutHint={isDesktop ? '2' : null}
+                isSelected={selected === Gender.female}
+                onTap={() => appState.selectGender(Gender.female)}
+              />
+            </div>
+          </div>
+
+          <div style={{ height: 16 }} />
+
+          <div
+            style={{
+              minHeight: 38,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'opacity 250ms ease-in-out',
+            }}
+          >
+            {selected != null ? (
+              <div
+                key={appState.speakerId}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: AppTheme.surface,
+                  borderRadius: 16,
+                  border: `1px solid ${AppTheme.borderLight}`,
+                  boxShadow: AppTheme.cardShadow,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <span
+                  className="material-icons-round"
+                  style={{
+                    fontSize: 18,
+                    color: AppTheme.primary,
+                  }}
+                >
+                  fingerprint
+                </span>
+                <div style={{ width: 8 }} />
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: AppTheme.textDark,
+                  }}
+                >
+                  {`معرّف المساهم: ${appState.speakerId}`}
+                </span>
+              </div>
+            ) : (
+              <div style={{ height: 38 }} />
+            )}
+          </div>
+
+          <div style={{ height: 20 }} />
+
+          <div
+            style={{
+              width: '100%',
+              minHeight: 54,
+              transition: 'opacity 300ms ease-in-out',
+            }}
+          >
+            {selected != null ? (
+              <button
+                type="button"
+                onClick={onStart}
+                style={{
+                  width: '100%',
+                  height: 54,
+                  backgroundColor: AppTheme.primary,
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 14,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  fontSize: 17,
+                  fontWeight: 900,
+                  boxShadow: `0 4px 14px ${AppTheme.primary}4D`,
+                }}
+              >
+                <span className="material-icons-round" style={{ fontSize: 24 }}>
+                  play_arrow
+                </span>
+                <span>ابدأ التحدي 🚀</span>
+              </button>
+            ) : (
+              <div style={{ height: 54 }} />
+            )}
+          </div>
+
+          <div style={{ height: 12 }} />
+        </div>
+      </ResponsiveContainer>
+    </div>
+  );
 }
