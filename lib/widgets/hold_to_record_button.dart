@@ -1,234 +1,204 @@
-import 'package:flutter/material.dart';
+import React, { useState, useEffect, useRef } from 'react';
 
-enum RecordingMode {
-  hold,
-  tapToToggle,
-}
+export const RecordingMode = Object.freeze({
+  hold: 'hold',
+  tapToToggle: 'tapToToggle',
+});
 
-/// Dynamic microphone recording button supporting both "Hold to record"
-/// and "Tap to toggle" modes with multi-layer pulsating ripple rings,
-/// mouse hover states, and responsive styling.
-class HoldToRecordButton extends StatefulWidget {
-  final VoidCallback onRecordStart;
-  final VoidCallback onRecordStop;
-  final bool isRecording;
-  final bool isBusy;
-  final Color color;
-  final RecordingMode mode;
+export function HoldToRecordButton({
+  onRecordStart,
+  onRecordStop,
+  color,
+  isRecording = false,
+  isBusy = false,
+  mode = RecordingMode.hold,
+}) {
+  const [internalPressed, setInternalPressed] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [, setTick] = useState(0);
 
-  const HoldToRecordButton({
-    super.key,
-    required this.onRecordStart,
-    required this.onRecordStop,
-    required this.color,
-    this.isRecording = false,
-    this.isBusy = false,
-    this.mode = RecordingMode.hold,
-  });
+  const pulseStartTimeRef = useRef(null);
+  const animationFrameRef = useRef(null);
 
-  @override
-  State<HoldToRecordButton> createState() => _HoldToRecordButtonState();
-}
+  const active = isRecording || internalPressed;
+  const activeColor = active ? '#E63946' : color;
 
-class _HoldToRecordButtonState extends State<HoldToRecordButton>
-    with TickerProviderStateMixin {
-  late final AnimationController _pulseController;
-  late final AnimationController _scaleController;
-  late final Animation<double> _pulseAnimation;
-  late final Animation<double> _scaleAnimation;
-  bool _internalPressed = false;
-  bool _isHovered = false;
-
-  bool get _active => widget.isRecording || _internalPressed;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    );
-
-    _pulseAnimation = CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeOutQuad,
-    );
-
-    _scaleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    );
-
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.easeOutCubic),
-    );
-
-    if (widget.isRecording) {
-      _pulseController.repeat();
-      _scaleController.forward();
-    }
-  }
-
-  @override
-  void didUpdateWidget(HoldToRecordButton oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isRecording != oldWidget.isRecording) {
-      if (widget.isRecording) {
-        _pulseController.repeat();
-        _scaleController.forward();
-      } else {
-        _pulseController.stop();
-        _pulseController.reset();
-        _scaleController.reverse();
-        _internalPressed = false;
+  useEffect(() => {
+    if (active) {
+      if (!pulseStartTimeRef.current) {
+        pulseStartTimeRef.current = performance.now();
       }
-    }
-  }
 
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    _scaleController.dispose();
-    super.dispose();
-  }
+      const animate = () => {
+        setTick((t) => t + 1);
+        animationFrameRef.current = requestAnimationFrame(animate);
+      };
 
-  // --- Hold Mode Handlers ---
-  void _handleHoldDown(TapDownDetails _) {
-    if (widget.mode != RecordingMode.hold || widget.isBusy || widget.isRecording) return;
-    setState(() => _internalPressed = true);
-    _scaleController.forward();
-    _pulseController.repeat();
-    widget.onRecordStart();
-  }
-
-  void _handleHoldUp(TapUpDetails _) => _releaseHold();
-
-  void _handleHoldCancel() => _releaseHold();
-
-  void _releaseHold() {
-    if (widget.mode != RecordingMode.hold) return;
-    if (!_internalPressed && !widget.isRecording) return;
-    setState(() => _internalPressed = false);
-    _scaleController.reverse();
-    _pulseController.stop();
-    _pulseController.reset();
-    widget.onRecordStop();
-  }
-
-  // --- Tap to Toggle Mode Handler ---
-  void _handleTapToggle() {
-    if (widget.mode != RecordingMode.tapToToggle || widget.isBusy) return;
-    if (widget.isRecording) {
-      widget.onRecordStop();
+      animationFrameRef.current = requestAnimationFrame(animate);
     } else {
-      widget.onRecordStart();
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      pulseStartTimeRef.current = null;
+      setTick((t) => t + 1);
     }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    final activeColor = _active ? const Color(0xFFE63946) : widget.color;
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [active]);
 
-    return Center(
-      child: MouseRegion(
-        cursor: widget.isBusy ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
-        child: SizedBox(
+  const getLinearPulse = () => {
+    if (!active || !pulseStartTimeRef.current) return 0;
+    const elapsed = performance.now() - pulseStartTimeRef.current;
+    return (elapsed % 1400) / 1400;
+  };
+
+  const easeOutQuad = (t) => t * (2 - t);
+  const pulseVal = easeOutQuad(getLinearPulse());
+
+  const handleHoldDown = (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (mode !== RecordingMode.hold || isBusy || isRecording) return;
+    setInternalPressed(true);
+    onRecordStart();
+  };
+
+  const handleHoldUp = () => {
+    releaseHold();
+  };
+
+  const releaseHold = () => {
+    if (mode !== RecordingMode.hold) return;
+    if (!internalPressed && !isRecording) return;
+    setInternalPressed(false);
+    onRecordStop();
+  };
+
+  const handleTapToggle = () => {
+    if (mode !== RecordingMode.tapToToggle || isBusy) return;
+    if (isRecording) {
+      onRecordStop();
+    } else {
+      onRecordStart();
+    }
+  };
+
+  const ripple2Val = pulseVal;
+  const ripple1Val = (pulseVal + 0.5) % 1.0;
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      <div
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => {
+          setIsHovered(false);
+          if (internalPressed) releaseHold();
+        }}
+        style={{
           width: 190,
           height: 190,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Ripple layer 2 (outer)
-              AnimatedBuilder(
-                animation: _pulseAnimation,
-                builder: (context, _) {
-                  if (!_active) return const SizedBox.shrink();
-                  final value = _pulseAnimation.value;
-                  return Container(
-                    width: 130 + (60 * value),
-                    height: 130 + (60 * value),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: activeColor.withOpacity((1.0 - value) * 0.25),
-                    ),
-                  );
-                },
-              ),
+          position: 'relative',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          cursor: isBusy ? 'not-allowed' : 'pointer',
+          userSelect: 'none',
+        }}
+      >
+        {/* Ripple layer 2 (outer) */}
+        {active && (
+          <div
+            style={{
+              position: 'absolute',
+              width: 130 + 60 * ripple2Val,
+              height: 130 + 60 * ripple2Val,
+              borderRadius: '50%',
+              backgroundColor: `${activeColor}${Math.round(
+                (1.0 - ripple2Val) * 0.25 * 255
+              )
+                .toString(16)
+                .padStart(2, '0')}`,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
 
-              // Ripple layer 1 (inner)
-              AnimatedBuilder(
-                animation: _pulseAnimation,
-                builder: (context, _) {
-                  if (!_active) return const SizedBox.shrink();
-                  final value = (_pulseAnimation.value + 0.5) % 1.0;
-                  return Container(
-                    width: 130 + (40 * value),
-                    height: 130 + (40 * value),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: activeColor.withOpacity((1.0 - value) * 0.35),
-                    ),
-                  );
-                },
-              ),
+        {/* Ripple layer 1 (inner) */}
+        {active && (
+          <div
+            style={{
+              position: 'absolute',
+              width: 130 + 40 * ripple1Val,
+              height: 130 + 40 * ripple1Val,
+              borderRadius: '50%',
+              backgroundColor: `${activeColor}${Math.round(
+                (1.0 - ripple1Val) * 0.35 * 255
+              )
+                .toString(16)
+                .padStart(2, '0')}`,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
 
-              // Main Interactive Recording Button
-              GestureDetector(
-                onTapDown: widget.mode == RecordingMode.hold ? _handleHoldDown : null,
-                onTapUp: widget.mode == RecordingMode.hold ? _handleHoldUp : null,
-                onTapCancel: widget.mode == RecordingMode.hold ? _handleHoldCancel : null,
-                onTap: widget.mode == RecordingMode.tapToToggle ? _handleTapToggle : null,
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutCubic,
-                    width: _active ? 136 : (_isHovered ? 130 : 124),
-                    height: _active ? 136 : (_isHovered ? 130 : 124),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: _active
-                            ? [const Color(0xFFFF4D6D), const Color(0xFFC9184A)]
-                            : [widget.color, widget.color.withOpacity(0.85)],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: activeColor.withOpacity(_active ? 0.55 : (_isHovered ? 0.45 : 0.3)),
-                          blurRadius: _active ? 30 : (_isHovered ? 24 : 16),
-                          offset: Offset(0, _active ? 10 : (_isHovered ? 8 : 6)),
-                          spreadRadius: _active ? 2 : (_isHovered ? 1 : 0),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        transitionBuilder: (child, anim) =>
-                            ScaleTransition(scale: anim, child: child),
-                        child: Icon(
-                          _active
-                              ? (widget.mode == RecordingMode.tapToToggle
-                                  ? Icons.stop_rounded
-                                  : Icons.mic_rounded)
-                              : Icons.mic_none_rounded,
-                          key: ValueKey('${_active}_${widget.mode}'),
-                          color: Colors.white,
-                          size: _active ? 58 : 52,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+        {/* Main Interactive Recording Button */}
+        <div
+          onMouseDown={mode === RecordingMode.hold ? handleHoldDown : undefined}
+          onMouseUp={mode === RecordingMode.hold ? handleHoldUp : undefined}
+          onTouchStart={mode === RecordingMode.hold ? handleHoldDown : undefined}
+          onTouchEnd={mode === RecordingMode.hold ? handleHoldUp : undefined}
+          onTouchCancel={mode === RecordingMode.hold ? releaseHold : undefined}
+          onClick={mode === RecordingMode.tapToToggle ? handleTapToggle : undefined}
+          style={{
+            transform: `scale(${active ? 1.08 : 1.0})`,
+            transition:
+              'transform 150ms cubic-bezier(0.215, 0.61, 0.355, 1), width 200ms cubic-bezier(0.215, 0.61, 0.355, 1), height 200ms cubic-bezier(0.215, 0.61, 0.355, 1)',
+            width: active ? 136 : isHovered ? 130 : 124,
+            height: active ? 136 : isHovered ? 130 : 124,
+            borderRadius: '50%',
+            background: active
+              ? 'linear-gradient(to bottom right, #FF4D6D, #C9184A)'
+              : `linear-gradient(to bottom right, ${color}, ${color}D9)`,
+            boxShadow: `0 ${active ? 10 : isHovered ? 8 : 6}px ${
+              active ? 30 : isHovered ? 24 : 16
+            }px ${active ? 2 : isHovered ? 1 : 0}px ${activeColor}${Math.round(
+              (active ? 0.55 : isHovered ? 0.45 : 0.3) * 255
+            )
+              .toString(16)
+              .padStart(2, '0')}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1,
+          }}
+        >
+          <span
+            key={`${active}_${mode}`}
+            className="material-icons-round"
+            style={{
+              color: '#FFFFFF',
+              fontSize: active ? 58 : 52,
+              transition: 'transform 200ms ease, font-size 200ms ease',
+            }}
+          >
+            {active
+              ? mode === RecordingMode.tapToToggle
+                ? 'stop'
+                : 'mic'
+              : 'mic_none'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 }
