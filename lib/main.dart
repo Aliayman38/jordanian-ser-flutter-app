@@ -1,34 +1,38 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'screens/gender_selection_screen.dart';
-import 'services/app_state.dart';
-import 'theme/app_theme.dart';
+import React, { useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { GenderSelectionScreen } from './screens/gender_selection_screen';
+import { AppStateProvider } from './services/app_state';
+import { AppTheme } from './theme/app_theme';
 
-void main() {
-  runApp(const JordanianSERApp());
+export function JordanianSERApp() {
+  const [currentScreen, setCurrentScreen] = useState(null);
+
+  const navigate = (screen) => {
+    setCurrentScreen(screen);
+  };
+
+  return (
+    <AppStateProvider>
+      <div
+        dir="rtl"
+        style={{
+          minHeight: '100vh',
+          backgroundColor: AppTheme.background,
+          fontFamily: AppTheme.theme.fontFamily,
+          color: AppTheme.textDark,
+          margin: 0,
+          padding: 0,
+          boxSizing: 'border-box',
+        }}
+      >
+        {currentScreen || <GenderSelectionScreen navigate={navigate} />}
+      </div>
+    </AppStateProvider>
+  );
 }
 
-class JordanianSERApp extends StatelessWidget {
-  const JordanianSERApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AppState(),
-      child: MaterialApp(
-        title: 'تحدي الصوت الأردني',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.theme,
-        locale: const Locale('ar'),
-        builder: (context, child) {
-          // Force RTL layout for the Arabic-first UI regardless of device locale.
-          return Directionality(
-            textDirection: TextDirection.rtl,
-            child: child!,
-          );
-        },
-        home: const GenderSelectionScreen(),
-      ),
-    );
-  }
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  const root = createRoot(rootElement);
+  root.render(<JordanianSERApp />);
 }
