@@ -1,27 +1,34 @@
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:path_provider/path_provider.dart';
+import * as FileSystem from 'expo-file-system';
 
-Future<Uint8List?> readAudioBytes(String pathOrBlobUrl) async {
+export async function readAudioBytes(pathOrBlobUrl) {
   try {
-    final file = File(pathOrBlobUrl);
-    if (await file.exists()) {
-      return await file.readAsBytes();
+    const fileInfo = await FileSystem.getInfoAsync(pathOrBlobUrl);
+    if (fileInfo.exists) {
+      const base64 = await FileSystem.readAsStringAsync(pathOrBlobUrl, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes;
     }
   } catch (_) {}
   return null;
 }
 
-Future<void> deleteAudioFile(String pathOrBlobUrl) async {
+export async function deleteAudioFile(pathOrBlobUrl) {
   try {
-    final file = File(pathOrBlobUrl);
-    if (await file.exists()) {
-      await file.delete();
+    const fileInfo = await FileSystem.getInfoAsync(pathOrBlobUrl);
+    if (fileInfo.exists) {
+      await FileSystem.deleteAsync(pathOrBlobUrl, { idempotent: true });
     }
   } catch (_) {}
 }
 
-Future<String> getTempAudioPath() async {
-  final dir = await getTemporaryDirectory();
-  return '${dir.path}/ser_${DateTime.now().millisecondsSinceEpoch}.wav';
+export async function getTempAudioPath() {
+  const dir = FileSystem.cacheDirectory;
+  return `${dir}ser_${Date.now()}.wav`;
 }
