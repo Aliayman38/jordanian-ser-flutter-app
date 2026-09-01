@@ -1,864 +1,829 @@
-import 'dart:async';
-import 'dart:math';
-import 'dart:ui';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import '../models/emotion.dart';
-import '../services/api_service.dart';
-import '../services/app_state.dart';
-import '../services/audio_service.dart';
-import '../theme/app_theme.dart';
-import '../widgets/audio_visualizer_wave.dart';
-import '../widgets/hold_to_record_button.dart';
-import '../widgets/responsive_container.dart';
+import React, { useState, useEffect, useRef } from 'react';
+import { ApiService } from '../services/api_service';
+import { useAppState } from '../services/app_state';
+import { AudioService } from '../services/audio_service';
+import { AppTheme } from '../theme/app_theme';
+import { AudioVisualizerWave } from '../widgets/audio_visualizer_wave';
+import { HoldToRecordButton, RecordingMode } from '../widgets/hold_to_record_button';
+import { ResponsiveContainer } from '../widgets/responsive_container';
 
-enum _RecordingStage { idle, recording, uploading }
+const RecordingStage = Object.freeze({
+  idle: 'idle',
+  recording: 'recording',
+  uploading: 'uploading',
+});
 
-/// Interactive recording screen: rotating Jordanian prompts, live frequency visualizer,
-/// elapsed timer, dual hold/tap modes, minimum duration protection, gamified celebration,
-/// and responsive dual-pane layout with keyboard shortcuts for Web & Desktop.
-class RecordingScreen extends StatefulWidget {
-  final EmotionData emotion;
-  const RecordingScreen({super.key, required this.emotion});
+function SuccessDialog({ isOpen, onClose, onRecordAgain, onGoToMenu, score }) {
+  if (!isOpen) return null;
 
-  @override
-  State<RecordingScreen> createState() => _RecordingScreenState();
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: '#fff',
+          borderRadius: 28,
+          padding: '28px 24px',
+          maxWidth: 460,
+          width: '90%',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          boxSizing: 'border-box',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            background: AppTheme.amberGradient,
+            boxShadow: `0 8px 20px ${AppTheme.accentOrange}59`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <span style={{ fontSize: 40 }}>🎉</span>
+        </div>
+
+        <div style={{ height: 16 }} />
+
+        <h2
+          style={{
+            fontSize: 22,
+            fontWeight: 900,
+            color: AppTheme.textDark,
+            textAlign: 'center',
+            margin: 0,
+          }}
+        >
+          فجرت المايك يا غالي! 🇯🇴
+        </h2>
+
+        <div style={{ height: 8 }} />
+
+        <p
+          style={{
+            fontSize: 14,
+            color: AppTheme.textMuted,
+            lineHeight: 1.5,
+            textAlign: 'center',
+            margin: 0,
+          }}
+        >
+          تم رفع تسجيلك بنجاح للمشروع الوطني، شكراً لمساهمتك القيمة!
+        </p>
+
+        <div style={{ height: 16 }} />
+
+        <div
+          style={{
+            padding: '8px 16px',
+            backgroundColor: `${AppTheme.primary}1A`,
+            borderRadius: 16,
+            border: `1px solid ${AppTheme.primary}40`,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <span
+            className="material-icons-round"
+            style={{ color: AppTheme.primary, fontSize: 20 }}
+          >
+            stars
+          </span>
+          <div style={{ width: 8 }} />
+          <span
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: AppTheme.primaryDark,
+            }}
+          >
+            {`مجموع مساهماتك الآن: ${score}`}
+          </span>
+        </div>
+
+        <div style={{ height: 24 }} />
+
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button
+            type="button"
+            style={{
+              width: '100%',
+              height: 50,
+              backgroundColor: AppTheme.primary,
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: 12,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              fontSize: 15.5,
+              fontWeight: 'bold',
+            }}
+            onClick={onRecordAgain}
+          >
+            <span className="material-icons-round" style={{ fontSize: 20 }}>
+              refresh
+            </span>
+            <span>تسجيل جملة ثانية</span>
+          </button>
+
+          <button
+            type="button"
+            style={{
+              width: '100%',
+              height: 50,
+              backgroundColor: 'transparent',
+              color: AppTheme.primary,
+              border: `1px solid ${AppTheme.primary}`,
+              borderRadius: 12,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              fontSize: 15,
+              fontWeight: 600,
+            }}
+            onClick={onGoToMenu}
+          >
+            <span className="material-icons-round" style={{ fontSize: 20 }}>
+              grid_view
+            </span>
+            <span>العودة لقائمة المشاعر</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-class _RecordingScreenState extends State<RecordingScreen> {
-  final AudioService _audioService = AudioService();
-  final ApiService _apiService = ApiService();
-  final FocusNode _focusNode = FocusNode();
+function Shortcut({ keyLabel, actionLabel }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div
+        style={{
+          padding: '3px 7px',
+          backgroundColor: '#ffffff',
+          borderRadius: 6,
+          border: `1.2px solid ${AppTheme.borderLight}`,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          fontSize: 11,
+          fontWeight: 800,
+          color: AppTheme.textDark,
+          fontFamily: 'monospace',
+        }}
+      >
+        {keyLabel}
+      </div>
+      <div style={{ width: 6 }} />
+      <span
+        style={{
+          fontSize: 11.5,
+          fontWeight: 600,
+          color: AppTheme.textMuted,
+        }}
+      >
+        {actionLabel}
+      </span>
+    </div>
+  );
+}
 
-  late int _promptIndex;
-  _RecordingStage _stage = _RecordingStage.idle;
-  RecordingMode _recordingMode = RecordingMode.hold;
-  String? _lastError;
-  String? _infoTip;
+function KeyboardShortcutsCheatSheet({ isRecording, mode }) {
+  return (
+    <div
+      style={{
+        padding: '10px 14px',
+        backgroundColor: AppTheme.surfaceElevated,
+        borderRadius: 14,
+        border: `1px solid ${AppTheme.borderLight}`,
+        display: 'flex',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+      }}
+    >
+      <Shortcut keyLabel="Space" actionLabel={isRecording ? 'إيقاف وإرسال' : 'تسجيل'} />
+      <Shortcut keyLabel="R" actionLabel="جملة جديدة" />
+      <Shortcut keyLabel="Esc" actionLabel="رجوع" />
+    </div>
+  );
+}
 
-  Timer? _timer;
-  int _elapsedMilliseconds = 0;
-  DateTime? _recordStartTime;
+function ModeItem({ label, isSelected, onTap }) {
+  return (
+    <div
+      onClick={onTap}
+      style={{
+        cursor: onTap ? 'pointer' : 'default',
+        borderRadius: 12,
+        padding: '8px 14px',
+        backgroundColor: isSelected ? AppTheme.primary : 'transparent',
+        transition: 'background-color 200ms ease',
+        userSelect: 'none',
+      }}
+    >
+      <span
+        style={{
+          fontSize: 12.5,
+          fontWeight: isSelected ? 800 : 600,
+          color: isSelected ? '#ffffff' : AppTheme.textMuted,
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
 
-  @override
-  void initState() {
-    super.initState();
-    _promptIndex = Random().nextInt(widget.emotion.prompts.length);
+function RecordingModeSelector({ currentMode, isBusy, onModeChanged }) {
+  return (
+    <div
+      style={{
+        padding: 4,
+        backgroundColor: AppTheme.surface,
+        borderRadius: 16,
+        border: `1px solid ${AppTheme.borderLight}`,
+        display: 'inline-flex',
+        alignItems: 'center',
+      }}
+    >
+      <ModeItem
+        label="اضغط واستمر 👆"
+        isSelected={currentMode === RecordingMode.hold}
+        onTap={isBusy ? null : () => onModeChanged(RecordingMode.hold)}
+      />
+      <div style={{ width: 4 }} />
+      <ModeItem
+        label="ضغطة للبدء والإيقاف ⏯️"
+        isSelected={currentMode === RecordingMode.tapToToggle}
+        onTap={isBusy ? null : () => onModeChanged(RecordingMode.tapToToggle)}
+      />
+    </div>
+  );
+}
+
+function PromptCard({
+  prompt,
+  emotion,
+  onShuffle,
+  promptNumber,
+  totalPrompts,
+  isDesktop = false,
+}) {
+  return (
+    <div
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: 20,
+        backgroundColor: `${emotion.color}14`,
+        borderRadius: 24,
+        border: `1.5px solid ${emotion.color}4D`,
+        boxShadow: `0 6px 16px ${emotion.color}14`,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div
+            style={{
+              padding: '4px 8px',
+              backgroundColor: `${emotion.color}2E`,
+              borderRadius: 8,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: emotion.darkColor,
+              }}
+            >
+              {`جملة ${promptNumber} من ${totalPrompts}`}
+            </span>
+          </div>
+          <div style={{ width: 8 }} />
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: AppTheme.textMuted,
+            }}
+          >
+            {`بنبرة ${emotion.labelArabic}:`}
+          </span>
+        </div>
+
+        {onShuffle && (
+          <button
+            type="button"
+            onClick={onShuffle}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: emotion.darkColor,
+              padding: '4px 10px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span className="material-icons-round" style={{ fontSize: 16 }}>
+              shuffle
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 800 }}>
+              {isDesktop ? 'جملة ثانية (R)' : 'جملة ثانية'}
+            </span>
+          </button>
+        )}
+      </div>
+
+      <div style={{ height: 12 }} />
+
+      <div
+        key={prompt}
+        style={{
+          textAlign: 'right',
+          fontSize: 21,
+          fontWeight: 800,
+          lineHeight: 1.55,
+          color: AppTheme.textDark,
+          transition: 'opacity 250ms ease-in-out',
+        }}
+      >
+        {prompt}
+      </div>
+    </div>
+  );
+}
+
+function ErrorBanner({ message }) {
+  return (
+    <div
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: 12,
+        backgroundColor: '#fef2f2',
+        borderRadius: 14,
+        border: '1px solid #fecaca',
+        display: 'flex',
+        alignItems: 'center',
+      }}
+    >
+      <span
+        className="material-icons-round"
+        style={{ color: '#dc2626', fontSize: 20 }}
+      >
+        error_outline
+      </span>
+      <div style={{ width: 10 }} />
+      <span style={{ color: '#991b1b', fontSize: 13, flex: 1 }}>{message}</span>
+    </div>
+  );
+}
+
+function InfoBanner({ message }) {
+  return (
+    <div
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: 12,
+        backgroundColor: '#fffbeb',
+        borderRadius: 14,
+        border: '1px solid #fcd34d',
+        display: 'flex',
+        alignItems: 'center',
+      }}
+    >
+      <span
+        className="material-icons-round"
+        style={{ color: '#92400e', fontSize: 20 }}
+      >
+        info_outline
+      </span>
+      <div style={{ width: 10 }} />
+      <span
+        style={{
+          color: '#78350f',
+          fontSize: 13,
+          fontWeight: 600,
+          flex: 1,
+        }}
+      >
+        {message}
+      </span>
+    </div>
+  );
+}
+
+export function RecordingScreen({ emotion, onBack }) {
+  const appState = useAppState();
+  const audioServiceRef = useRef(null);
+  const apiServiceRef = useRef(null);
+
+  if (!audioServiceRef.current) {
+    audioServiceRef.current = new AudioService();
+  }
+  if (!apiServiceRef.current) {
+    apiServiceRef.current = new ApiService();
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _audioService.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
+  const _audioService = audioServiceRef.current;
+  const _apiService = apiServiceRef.current;
 
-  String get _currentPrompt => widget.emotion.promptFor(_promptIndex);
+  const [promptIndex, setPromptIndex] = useState(() =>
+    Math.floor(Math.random() * emotion.prompts.length)
+  );
+  const [stage, setStage] = useState(RecordingStage.idle);
+  const [recordingMode, setRecordingMode] = useState(RecordingMode.hold);
+  const [lastError, setLastError] = useState(null);
+  const [infoTip, setInfoTip] = useState(null);
+  const [elapsedMilliseconds, setElapsedMilliseconds] = useState(0);
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
-  void _shufflePrompt() {
-    if (_stage == _RecordingStage.recording || _stage == _RecordingStage.uploading) return;
-    setState(() {
-      _promptIndex = (_promptIndex + 1) % widget.emotion.prompts.length;
-      _lastError = null;
-      _infoTip = null;
-    });
-  }
+  const timerRef = useRef(null);
+  const recordStartTimeRef = useRef(null);
 
-  void _startTimer() {
-    _elapsedMilliseconds = 0;
-    _recordStartTime = DateTime.now();
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (mounted) {
-        setState(() {
-          _elapsedMilliseconds =
-              DateTime.now().difference(_recordStartTime!).inMilliseconds;
-        });
-      }
-    });
-  }
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      _audioService.dispose();
+    };
+  }, [_audioService]);
 
-  void _stopTimer() {
-    _timer?.cancel();
-    _timer = null;
-  }
+  const currentPrompt = emotion.promptFor(promptIndex);
 
-  String get _formattedTimer {
-    final totalSeconds = _elapsedMilliseconds ~/ 1000;
-    final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
-    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
+  const shufflePrompt = () => {
+    if (stage === RecordingStage.recording || stage === RecordingStage.uploading) return;
+    setPromptIndex((prev) => (prev + 1) % emotion.prompts.length);
+    setLastError(null);
+    setInfoTip(null);
+  };
 
-  Future<void> _startRecording() async {
-    setState(() {
-      _lastError = null;
-      _infoTip = null;
-      _stage = _RecordingStage.recording;
-    });
-    _startTimer();
+  const startTimer = () => {
+    setElapsedMilliseconds(0);
+    recordStartTimeRef.current = Date.now();
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setElapsedMilliseconds(Date.now() - recordStartTimeRef.current);
+    }, 100);
+  };
+
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const formattedTimer = (() => {
+    const totalSeconds = Math.floor(elapsedMilliseconds / 1000);
+    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    return `${minutes}:${seconds}`;
+  })();
+
+  const startRecording = async () => {
+    setLastError(null);
+    setInfoTip(null);
+    setStage(RecordingStage.recording);
+    startTimer();
 
     try {
       await _audioService.startRecording();
     } catch (e) {
-      _stopTimer();
-      if (!mounted) return;
-      setState(() {
-        _stage = _RecordingStage.idle;
-        _lastError = e.toString();
-      });
+      stopTimer();
+      setStage(RecordingStage.idle);
+      setLastError(e.toString());
     }
-  }
+  };
 
-  Future<void> _stopRecordingAndUpload() async {
-    if (_stage != _RecordingStage.recording) return;
-    _stopTimer();
+  const stopRecordingAndUpload = async () => {
+    if (stage !== RecordingStage.recording) return;
+    stopTimer();
 
-    final recordDurationMs = _elapsedMilliseconds;
+    const recordDurationMs = elapsedMilliseconds;
 
-    // Minimum duration guard: at least 1000ms (1.0 second)
     if (recordDurationMs < 1000) {
       await _audioService.stopRecording();
-      if (!mounted) return;
-      setState(() {
-        _stage = _RecordingStage.idle;
-        _infoTip = 'التسجيل قصير جداً (أقل من ثانية). يرجى التحدث بوضوح وإعادة المحاولة.';
-      });
+      setStage(RecordingStage.idle);
+      setInfoTip(
+        'التسجيل قصير جداً (أقل من ثانية). يرجى التحدث بوضوح وإعادة المحاولة.'
+      );
       return;
     }
 
-    setState(() => _stage = _RecordingStage.uploading);
+    setStage(RecordingStage.uploading);
 
-    final audioData = await _audioService.stopRecording();
-    if (audioData == null || audioData.isEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _stage = _RecordingStage.idle;
-        _lastError = 'ما انسجل الصوت، جرب مرة ثانية.';
-      });
+    const audioData = await _audioService.stopRecording();
+    if (!audioData || audioData.isEmpty) {
+      setStage(RecordingStage.idle);
+      setLastError('ما انسجل الصوت، جرب مرة ثانية.');
       return;
     }
 
-    final appState = context.read<AppState>();
-    final result = await _apiService.submitAudio(
-      audioData: audioData,
+    const result = await _apiService.submitAudio({
+      audioData,
       speakerId: appState.speakerId,
-      emotionTag: widget.emotion.apiTag,
-      referenceText: _currentPrompt,
-    );
-
-    if (!mounted) return;
+      emotionTag: emotion.apiTag,
+      referenceText: currentPrompt,
+    });
 
     if (result.success) {
       appState.incrementScore();
-      setState(() {
-        _stage = _RecordingStage.idle;
-        _elapsedMilliseconds = 0;
-      });
-      await _showSuccessDialog();
+      setStage(RecordingStage.idle);
+      setElapsedMilliseconds(0);
+      setSuccessDialogOpen(true);
     } else {
-      setState(() {
-        _stage = _RecordingStage.idle;
-        _lastError = result.errorMessage ?? 'صار خطأ غير متوقع في رفع الصوت.';
-      });
+      setStage(RecordingStage.idle);
+      setLastError(result.errorMessage || 'صار خطأ غير متوقع في رفع الصوت.');
     }
-  }
+  };
 
-  Future<void> _showSuccessDialog() {
-    final appState = context.read<AppState>();
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.code === 'Space') {
+        event.preventDefault();
+        if (stage === RecordingStage.idle) {
+          startRecording();
+        } else if (stage === RecordingStage.recording) {
+          stopRecordingAndUpload();
+        }
+      } else if (event.key === 'r' || event.key === 'R' || event.key === 'n' || event.key === 'N') {
+        shufflePrompt();
+      } else if (event.key === 'Escape') {
+        if (onBack) onBack();
+      }
+    };
 
-    return showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-        ),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 460),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Celebration badge
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  gradient: AppTheme.amberGradient,
-                  shape: BoxShape.circle,
-                  boxShadow: AppTheme.glowShadow(AppTheme.accentOrange, opacity: 0.35),
-                ),
-                child: const Center(
-                  child: Text('🎉', style: TextStyle(fontSize: 40)),
-                ),
-              ),
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [stage, elapsedMilliseconds, promptIndex, emotion]);
 
-              const SizedBox(height: 16),
-
-              const Text(
-                'فجرت المايك يا غالي! 🇯🇴',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: AppTheme.textDark,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              const Text(
-                'تم رفع تسجيلك بنجاح للمشروع الوطني، شكراً لمساهمتك القيمة!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppTheme.textMuted,
-                  height: 1.5,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Score bump pill
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.primary.withOpacity(0.25)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.stars_rounded, color: AppTheme.primary, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'مجموع مساهماتك الآن: ${appState.score}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.primaryDark,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Action buttons
-              Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text(
-                        'تسجيل جملة ثانية',
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                        _shufflePrompt();
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.grid_view_rounded),
-                      label: const Text(
-                        'العودة لقائمة المشاعر',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String get _statusText {
-    switch (_stage) {
-      case _RecordingStage.idle:
-        return _recordingMode == RecordingMode.hold
-            ? 'اضغط واستمر بالضغط على المايك للتسجيل'
-            : 'اضغط على المايك للبدء، واضغط مرة أخرى للإيقاف';
-      case _RecordingStage.recording:
-        return _recordingMode == RecordingMode.hold
-            ? '🎙️ جاري التسجيل... ارفع إصبعك للإرسال'
-            : '🎙️ جاري التسجيل... اضغط لإيقاف التسجيل والإرسال';
-      case _RecordingStage.uploading:
+  const getStatusText = () => {
+    switch (stage) {
+      case RecordingStage.idle:
+        return recordingMode === RecordingMode.hold
+          ? 'اضغط واستمر بالضغط على المايك للتسجيل'
+          : 'اضغط على المايك للبدء، واضغط مرة أخرى للإيقاف';
+      case RecordingStage.recording:
+        return recordingMode === RecordingMode.hold
+          ? '🎙️ جاري التسجيل... ارفع إصبعك للإرسال'
+          : '🎙️ جاري التسجيل... اضغط لإيقاف التسجيل والإرسال';
+      case RecordingStage.uploading:
         return '🚀 جاري رفع المقطع الصوتي ومعالجته...';
+      default:
+        return '';
     }
-  }
+  };
 
-  @override
-  Widget build(BuildContext context) {
-    final emotion = widget.emotion;
-    final isRecording = _stage == _RecordingStage.recording;
-    final isUploading = _stage == _RecordingStage.uploading;
-    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+  const isRecording = stage === RecordingStage.recording;
+  const isUploading = stage === RecordingStage.uploading;
+  const isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 1024 : false;
 
-    Widget promptSection = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Mode Selector Pill Switcher
-        _RecordingModeSelector(
-          currentMode: _recordingMode,
-          isBusy: isRecording || isUploading,
-          onModeChanged: (mode) {
-            setState(() => _recordingMode = mode);
-          },
-        ),
+  const promptSection = (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+      }}
+    >
+      <RecordingModeSelector
+        currentMode={recordingMode}
+        isBusy={isRecording || isUploading}
+        onModeChanged={(mode) => setRecordingMode(mode)}
+      />
 
-        const SizedBox(height: 14),
+      <div style={{ height: 14 }} />
 
-        // Target Jordanian Prompt Card with Shuffle Button
-        _PromptCard(
-          prompt: _currentPrompt,
-          emotion: emotion,
-          onShuffle: isRecording || isUploading ? null : _shufflePrompt,
-          promptNumber: _promptIndex + 1,
-          totalPrompts: emotion.prompts.length,
-          isDesktop: isDesktop,
-        ),
+      <PromptCard
+        prompt={currentPrompt}
+        emotion={emotion}
+        onShuffle={isRecording || isUploading ? null : shufflePrompt}
+        promptNumber={promptIndex + 1}
+        totalPrompts={emotion.prompts.length}
+        isDesktop={isDesktop}
+      />
 
-        if (_lastError != null) ...[
-          const SizedBox(height: 12),
-          _ErrorBanner(message: _lastError!),
-        ],
+      {lastError && (
+        <>
+          <div style={{ height: 12 }} />
+          <ErrorBanner message={lastError} />
+        </>
+      )}
 
-        if (_infoTip != null) ...[
-          const SizedBox(height: 12),
-          _InfoBanner(message: _infoTip!),
-        ],
+      {infoTip && (
+        <>
+          <div style={{ height: 12 }} />
+          <InfoBanner message={infoTip} />
+        </>
+      )}
 
-        if (isDesktop) ...[
-          const SizedBox(height: 14),
-          _KeyboardShortcutsCheatSheet(
-            isRecording: isRecording,
-            mode: _recordingMode,
-          ),
-        ],
-      ],
-    );
+      {isDesktop && (
+        <>
+          <div style={{ height: 14 }} />
+          <KeyboardShortcutsCheatSheet
+            isRecording={isRecording}
+            mode={recordingMode}
+          />
+        </>
+      )}
+    </div>
+  );
 
-    Widget recordingControlsSection = Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Timer & Audio Frequency Waveform Visualizer
-        if (isRecording) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.red.shade200),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _formattedTimer,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.red.shade800,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
+  const recordingControlsSection = (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {isRecording && (
+        <>
+          <div
+            style={{
+              padding: '6px 16px',
+              backgroundColor: '#fef2f2',
+              borderRadius: 20,
+              border: '1px solid #fecaca',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: 10,
+                height: 10,
+                backgroundColor: '#ef4444',
+                borderRadius: '50%',
+              }}
+            />
+            <div style={{ width: 8 }} />
+            <span
+              style={{
+                fontSize: 16,
+                fontWeight: 900,
+                color: '#991b1b',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {formattedTimer}
+            </span>
+          </div>
+          <div style={{ height: 12 }} />
+        </>
+      )}
 
-        // Waveform Visualizer
-        AudioVisualizerWave(
-          isRecording: isRecording,
-          color: emotion.color,
-          secondaryColor: emotion.darkColor,
-        ),
+      <AudioVisualizerWave
+        isRecording={isRecording}
+        color={emotion.color}
+        secondaryColor={emotion.darkColor}
+      />
 
-        const SizedBox(height: 18),
+      <div style={{ height: 18 }} />
 
-        // Hold / Tap Record Button
-        if (isUploading)
-          const Column(
-            children: [
-              SizedBox(
-                width: 60,
-                height: 60,
-                child: CircularProgressIndicator(strokeWidth: 3.5),
-              ),
-              SizedBox(height: 16),
-            ],
-          )
-        else
-          HoldToRecordButton(
-            color: emotion.color,
-            isRecording: isRecording,
-            isBusy: isUploading,
-            mode: _recordingMode,
-            onRecordStart: _startRecording,
-            onRecordStop: _stopRecordingAndUpload,
-          ),
+      {isUploading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: '50%',
+              border: `3.5px solid ${AppTheme.borderLight}`,
+              borderTopColor: AppTheme.primary,
+              animation: 'spin 1s linear infinite',
+            }}
+          />
+          <div style={{ height: 16 }} />
+        </div>
+      ) : (
+        <HoldToRecordButton
+          color={emotion.color}
+          isRecording={isRecording}
+          isBusy={isUploading}
+          mode={recordingMode}
+          onRecordStart={startRecording}
+          onRecordStop={stopRecordingAndUpload}
+        />
+      )}
 
-        const SizedBox(height: 16),
+      <div style={{ height: 16 }} />
 
-        // Status instruction text
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: Text(
-            _statusText,
-            key: ValueKey(_statusText),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: isRecording ? FontWeight.w700 : FontWeight.w500,
-              color: isRecording ? AppTheme.textDark : AppTheme.textMuted,
-            ),
-          ),
-        ),
-      ],
-    );
+      <div
+        style={{
+          textAlign: 'center',
+          fontSize: 13.5,
+          fontWeight: isRecording ? 700 : 500,
+          color: isRecording ? AppTheme.textDark : AppTheme.textMuted,
+          transition: 'all 200ms ease',
+        }}
+      >
+        {getStatusText()}
+      </div>
+    </div>
+  );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(emotion.emoji, style: const TextStyle(fontSize: 22)),
-            const SizedBox(width: 8),
-            Text(
-              emotion.labelArabic,
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ],
-        ),
-      ),
-      body: Focus(
-        focusNode: _focusNode,
-        autofocus: true,
-        onKeyEvent: (node, event) {
-          if (event is KeyDownEvent) {
-            // Spacebar: start or toggle recording
-            if (event.logicalKey == LogicalKeyboardKey.space) {
-              if (_stage == _RecordingStage.idle) {
-                _startRecording();
-              } else if (_stage == _RecordingStage.recording) {
-                _stopRecordingAndUpload();
-              }
-              return KeyEventResult.handled;
-            }
-            // R / N: shuffle prompt
-            else if (event.logicalKey == LogicalKeyboardKey.keyR ||
-                event.logicalKey == LogicalKeyboardKey.keyN) {
-              _shufflePrompt();
-              return KeyEventResult.handled;
-            }
-            // Escape: back
-            else if (event.logicalKey == LogicalKeyboardKey.escape) {
-              Navigator.of(context).maybePop();
-              return KeyEventResult.handled;
-            }
-          }
-          return KeyEventResult.ignored;
-        },
-        child: ResponsiveContainer(
-          maxWidth: isDesktop ? 960 : 640,
-          wrapInCardOnDesktop: true,
-          child: isDesktop
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Right pane (RTL): Prompt & Mode
-                    Expanded(
-                      flex: 5,
-                      child: promptSection,
-                    ),
-                    const SizedBox(width: 32),
-                    // Left pane (RTL): Recording Visualizer & Button
-                    Expanded(
-                      flex: 5,
-                      child: recordingControlsSection,
-                    ),
-                  ],
-                )
-              : Column(
-                  children: [
-                    promptSection,
-                    const SizedBox(height: 20),
-                    recordingControlsSection,
-                    const SizedBox(height: 16),
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-}
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+        width: '100vw',
+      }}
+    >
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 16px',
+          height: 56,
+          backgroundColor: '#ffffff',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', margin: '0 auto' }}>
+          <span style={{ fontSize: 22 }}>{emotion.emoji}</span>
+          <div style={{ width: 8 }} />
+          <span style={{ fontWeight: 900, fontSize: 18 }}>{emotion.labelArabic}</span>
+        </div>
+      </header>
 
-class _KeyboardShortcutsCheatSheet extends StatelessWidget {
-  final bool isRecording;
-  final RecordingMode mode;
+      <ResponsiveContainer
+        maxWidth={isDesktop ? 960 : 640}
+        wrapInCardOnDesktop={true}
+      >
+        {isDesktop ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              width: '100%',
+            }}
+          >
+            <div style={{ flex: 5 }}>{promptSection}</div>
+            <div style={{ width: 32 }} />
+            <div style={{ flex: 5 }}>{recordingControlsSection}</div>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              width: '100%',
+            }}
+          >
+            {promptSection}
+            <div style={{ height: 20 }} />
+            {recordingControlsSection}
+            <div style={{ height: 16 }} />
+          </div>
+        )}
+      </ResponsiveContainer>
 
-  const _KeyboardShortcutsCheatSheet({
-    required this.isRecording,
-    required this.mode,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceElevated,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.borderLight),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildShortcut('Space', isRecording ? 'إيقاف وإرسال' : 'تسجيل'),
-          _buildShortcut('R', 'جملة جديدة'),
-          _buildShortcut('Esc', 'رجوع'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShortcut(String keyLabel, String actionLabel) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppTheme.borderLight, width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 3,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Text(
-            keyLabel,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textDark,
-              fontFamily: 'monospace',
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          actionLabel,
-          style: const TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textMuted,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RecordingModeSelector extends StatelessWidget {
-  final RecordingMode currentMode;
-  final bool isBusy;
-  final ValueChanged<RecordingMode> onModeChanged;
-
-  const _RecordingModeSelector({
-    required this.currentMode,
-    required this.isBusy,
-    required this.onModeChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderLight),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _ModeItem(
-            label: 'اضغط واستمر 👆',
-            isSelected: currentMode == RecordingMode.hold,
-            onTap: isBusy ? null : () => onModeChanged(RecordingMode.hold),
-          ),
-          const SizedBox(width: 4),
-          _ModeItem(
-            label: 'ضغطة للبدء والإيقاف ⏯️',
-            isSelected: currentMode == RecordingMode.tapToToggle,
-            onTap: isBusy ? null : () => onModeChanged(RecordingMode.tapToToggle),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ModeItem extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback? onTap;
-
-  const _ModeItem({
-    required this.label,
-    required this.isSelected,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppTheme.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-              color: isSelected ? Colors.white : AppTheme.textMuted,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PromptCard extends StatelessWidget {
-  final String prompt;
-  final EmotionData emotion;
-  final VoidCallback? onShuffle;
-  final int promptNumber;
-  final int totalPrompts;
-  final bool isDesktop;
-
-  const _PromptCard({
-    required this.prompt,
-    required this.emotion,
-    required this.onShuffle,
-    required this.promptNumber,
-    required this.totalPrompts,
-    this.isDesktop = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: emotion.color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: emotion.color.withOpacity(0.3),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: emotion.color.withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with prompt indicator & shuffle button
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: emotion.color.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'جملة $promptNumber من $totalPrompts',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: emotion.darkColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'بنبرة ${emotion.labelArabic}:',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-
-              // Shuffle prompt button
-              if (onShuffle != null)
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    foregroundColor: emotion.darkColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  ),
-                  icon: const Icon(Icons.shuffle_rounded, size: 16),
-                  label: Text(
-                    isDesktop ? 'جملة ثانية (R)' : 'جملة ثانية',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-                  ),
-                  onPressed: onShuffle,
-                ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Animated prompt text
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            transitionBuilder: (child, anim) =>
-                FadeTransition(opacity: anim, child: child),
-            child: Text(
-              prompt,
-              key: ValueKey(prompt),
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.w800,
-                height: 1.55,
-                color: AppTheme.textDark,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  final String message;
-  const _ErrorBanner({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.red.shade200),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline_rounded, color: Colors.red.shade600, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: Colors.red.shade800, fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoBanner extends StatelessWidget {
-  final String message;
-  const _InfoBanner({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.amber.shade50,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.amber.shade300),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline_rounded, color: Colors.amber.shade800, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                color: Colors.amber.shade900,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+      <SuccessDialog
+        isOpen={successDialogOpen}
+        onClose={() => setSuccessDialogOpen(false)}
+        onRecordAgain={() => {
+          setSuccessDialogOpen(false);
+          shufflePrompt();
+        }}
+        onGoToMenu={() => {
+          setSuccessDialogOpen(false);
+          if (onBack) onBack();
+        }}
+        score={appState.score}
+      />
+    </div>
+  );
 }
