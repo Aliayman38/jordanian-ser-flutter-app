@@ -1,42 +1,57 @@
-import 'dart:math';
-import 'package:flutter/foundation.dart';
-import '../models/speaker.dart';
+import React, { createContext, useContext, useState, useMemo } from 'react';
+import { Gender } from '../models/speaker';
 
-/// Lightweight app-wide state: selected gender + contribution score.
-///
-/// Kept deliberately simple (ChangeNotifier + Provider) since the app has
-/// a single linear flow and does not need a heavier state-management stack.
-class AppState extends ChangeNotifier {
-  Gender? _gender;
-  int _score = 0;
-  final Random _rng = Random();
+const AppStateContext = createContext(null);
 
-  Gender? get gender => _gender;
-  int get score => _score;
-  bool get hasSelectedGender => _gender != null;
+export function AppStateProvider({ children }) {
+  const [gender, setGender] = useState(null);
+  const [score, setScore] = useState(0);
 
-  /// Stable-ish per-session speaker id: gender prefix + random 4-digit suffix,
-  /// generated once per app session so all uploads in a session share it.
-  late final int _sessionSuffix = 1000 + _rng.nextInt(9000);
+  const sessionSuffix = useMemo(() => {
+    return 1000 + Math.floor(Math.random() * 9000);
+  }, []);
 
-  String get speakerId {
-    final prefix = _gender == Gender.male ? 'M' : 'F';
-    return '$prefix$_sessionSuffix';
+  const hasSelectedGender = gender !== null;
+
+  const speakerId = useMemo(() => {
+    const prefix = gender === Gender.male ? 'M' : 'F';
+    return `${prefix}${sessionSuffix}`;
+  }, [gender, sessionSuffix]);
+
+  const selectGender = (newGender) => {
+    setGender(newGender);
+  };
+
+  const incrementScore = () => {
+    setScore((prevScore) => prevScore + 1);
+  };
+
+  const reset = () => {
+    setGender(null);
+    setScore(0);
+  };
+
+  const value = {
+    gender,
+    score,
+    hasSelectedGender,
+    speakerId,
+    selectGender,
+    incrementScore,
+    reset,
+  };
+
+  return (
+    <AppStateContext.Provider value={value}>
+      {children}
+    </AppStateContext.Provider>
+  );
+}
+
+export function useAppState() {
+  const context = useContext(AppStateContext);
+  if (!context) {
+    throw new Error('useAppState must be used within an AppStateProvider');
   }
-
-  void selectGender(Gender gender) {
-    _gender = gender;
-    notifyListeners();
-  }
-
-  void incrementScore() {
-    _score += 1;
-    notifyListeners();
-  }
-
-  void reset() {
-    _gender = null;
-    _score = 0;
-    notifyListeners();
-  }
+  return context;
 }
