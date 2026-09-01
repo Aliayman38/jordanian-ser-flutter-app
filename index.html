@@ -2,6 +2,13 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // If hosted statically without Vite dev server, forward to compiled production bundle in ./dist/
+      if (window.location.port !== '5173' && !window.location.pathname.includes('/dist')) {
+        const base = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname + '/';
+        window.location.replace(base + 'dist/' + window.location.search + window.location.hash);
+      }
+    </script>
     <link rel="icon" type="image/svg+xml" href="./vite.svg" />
     <meta
       name="viewport"
