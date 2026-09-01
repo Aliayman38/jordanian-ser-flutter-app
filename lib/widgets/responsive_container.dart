@@ -1,132 +1,191 @@
-import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
+import React, { useState, useEffect } from 'react';
+import { AppTheme } from '../theme/app_theme';
 
-enum ScreenType { mobile, tablet, desktop }
+export const ScreenType = Object.freeze({
+  mobile: 'mobile',
+  tablet: 'tablet',
+  desktop: 'desktop',
+});
 
-class ResponsiveBreakpoints {
-  static const double mobileMax = 600;
-  static const double tabletMax = 1024;
+export class ResponsiveBreakpoints {
+  static mobileMax = 600;
+  static tabletMax = 1024;
 
-  static ScreenType getScreenType(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    if (width < mobileMax) return ScreenType.mobile;
-    if (width < tabletMax) return ScreenType.tablet;
+  static getScreenType() {
+    const width = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    if (width < ResponsiveBreakpoints.mobileMax) return ScreenType.mobile;
+    if (width < ResponsiveBreakpoints.tabletMax) return ScreenType.tablet;
     return ScreenType.desktop;
   }
 
-  static bool isMobile(BuildContext context) =>
-      getScreenType(context) == ScreenType.mobile;
+  static isMobile() {
+    return ResponsiveBreakpoints.getScreenType() === ScreenType.mobile;
+  }
 
-  static bool isTablet(BuildContext context) =>
-      getScreenType(context) == ScreenType.tablet;
+  static isTablet() {
+    return ResponsiveBreakpoints.getScreenType() === ScreenType.tablet;
+  }
 
-  static bool isDesktop(BuildContext context) =>
-      getScreenType(context) == ScreenType.desktop;
+  static isDesktop() {
+    return ResponsiveBreakpoints.getScreenType() === ScreenType.desktop;
+  }
 }
 
-/// A wrapper widget that ensures responsive padding, safe scrolling,
-/// and maximum content width constraint across mobile, tablet, and website/desktop screens.
-class ResponsiveContainer extends StatelessWidget {
-  final Widget child;
-  final double maxWidth;
-  final EdgeInsetsGeometry? padding;
-  final bool scrollable;
-  final bool useSafeArea;
-  final bool wrapInCardOnDesktop;
+export function ResponsiveContainer({
+  child,
+  children,
+  maxWidth = 720,
+  padding,
+  scrollable = true,
+  useSafeArea = true,
+  wrapInCardOnDesktop = false,
+}) {
+  const contentChild = child || children;
 
-  const ResponsiveContainer({
-    super.key,
-    required this.child,
-    this.maxWidth = 720,
-    this.padding,
-    this.scrollable = true,
-    this.useSafeArea = true,
-    this.wrapInCardOnDesktop = false,
-  });
+  const [windowDimensions, setWindowDimensions] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800,
+  }));
 
-  @override
-  Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final screenWidth = mediaQuery.size.width;
-    final isLandscape = mediaQuery.orientation == Orientation.landscape;
-    final isDesktop = screenWidth >= ResponsiveBreakpoints.tabletMax;
-    final isTablet = screenWidth >= ResponsiveBreakpoints.mobileMax && !isDesktop;
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
 
-    final defaultPadding = screenWidth < 380
-        ? const EdgeInsets.symmetric(horizontal: 14, vertical: 12)
-        : screenWidth < 600
-            ? EdgeInsets.symmetric(
-                horizontal: isLandscape ? 28 : 18,
-                vertical: isLandscape ? 12 : 16,
-              )
-            : isTablet
-                ? const EdgeInsets.symmetric(horizontal: 28, vertical: 20)
-                : const EdgeInsets.symmetric(horizontal: 36, vertical: 24);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-    final effectivePadding = padding ?? defaultPadding;
+  const screenWidth = windowDimensions.width;
+  const isLandscape = windowDimensions.width > windowDimensions.height;
+  const isDesktop = screenWidth >= ResponsiveBreakpoints.tabletMax;
+  const isTablet =
+    screenWidth >= ResponsiveBreakpoints.mobileMax && !isDesktop;
 
-    Widget buildCardWrapped(Widget inner) {
-      if (isDesktop && wrapInCardOnDesktop) {
-        return Container(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          margin: const EdgeInsets.symmetric(vertical: 20),
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppTheme.borderLight, width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primary.withOpacity(0.06),
-                blurRadius: 36,
-                offset: const Offset(0, 12),
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          child: inner,
-        );
-      }
-
-      return ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: Padding(
-          padding: effectivePadding,
-          child: inner,
-        ),
-      );
-    }
-
-    Widget content;
-
-    if (scrollable) {
-      content = LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight,
-              ),
-              child: Center(
-                child: buildCardWrapped(
-                  IntrinsicHeight(
-                    child: child,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      );
-    } else {
-      content = Center(child: buildCardWrapped(child));
-    }
-
-    if (useSafeArea) {
-      content = SafeArea(child: content);
-    }
-
-    return content;
+  let defaultPadding;
+  if (screenWidth < 380) {
+    defaultPadding = { horizontal: 14, vertical: 12 };
+  } else if (screenWidth < 600) {
+    defaultPadding = {
+      horizontal: isLandscape ? 28 : 18,
+      vertical: isLandscape ? 12 : 16,
+    };
+  } else if (isTablet) {
+    defaultPadding = { horizontal: 28, vertical: 20 };
+  } else {
+    defaultPadding = { horizontal: 36, vertical: 24 };
   }
+
+  const effectivePadding =
+    padding !== undefined && padding !== null
+      ? typeof padding === 'object'
+        ? padding
+        : { horizontal: padding, vertical: padding }
+      : defaultPadding;
+
+  const buildCardWrapped = (inner) => {
+    if (isDesktop && wrapInCardOnDesktop) {
+      return (
+        <div
+          style={{
+            maxWidth: `${maxWidth}px`,
+            width: '100%',
+            boxSizing: 'border-box',
+            margin: '20px 0',
+            padding: '28px',
+            backgroundColor: AppTheme.surface,
+            borderRadius: '28px',
+            border: `1.5px solid ${AppTheme.borderLight}`,
+            boxShadow: `0 12px 36px 2px ${AppTheme.primary}0F`,
+          }}
+        >
+          {inner}
+        </div>
+      );
+    }
+
+    return (
+      <div
+        style={{
+          maxWidth: `${maxWidth}px`,
+          width: '100%',
+          boxSizing: 'border-box',
+          padding: `${effectivePadding.vertical || 0}px ${
+            effectivePadding.horizontal || 0
+          }px`,
+        }}
+      >
+        {inner}
+      </div>
+    );
+  };
+
+  let content;
+
+  if (scrollable) {
+    content = (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div
+          style={{
+            minHeight: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+          }}
+        >
+          {buildCardWrapped(
+            <div style={{ width: '100%', height: 'fit-content' }}>
+              {contentChild}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  } else {
+    content = (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {buildCardWrapped(contentChild)}
+      </div>
+    );
+  }
+
+  if (useSafeArea) {
+    content = (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          boxSizing: 'border-box',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          paddingLeft: 'env(safe-area-inset-left, 0px)',
+          paddingRight: 'env(safe-area-inset-right, 0px)',
+        }}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return content;
 }
