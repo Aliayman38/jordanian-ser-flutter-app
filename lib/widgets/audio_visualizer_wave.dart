@@ -1,138 +1,115 @@
-import 'dart:math';
-import 'package:flutter/material.dart';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 
-/// Animated multi-bar waveform visualizer simulating audio frequencies during recording.
-class AudioVisualizerWave extends StatefulWidget {
-  final bool isRecording;
-  final Color color;
-  final Color? secondaryColor;
-  final int barCount;
-  final double maxHeight;
+export function AudioVisualizerWave({
+  isRecording,
+  color,
+  secondaryColor,
+  barCount = 24,
+  maxHeight = 56,
+}) {
+  const [, setTick] = useState(0);
+  const animationFrameRef = useRef(null);
+  const startTimeRef = useRef(null);
 
-  const AudioVisualizerWave({
-    super.key,
-    required this.isRecording,
-    required this.color,
-    this.secondaryColor,
-    this.barCount = 24,
-    this.maxHeight = 56,
-  });
-
-  @override
-  State<AudioVisualizerWave> createState() => _AudioVisualizerWaveState();
-}
-
-class _AudioVisualizerWaveState extends State<AudioVisualizerWave>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  final Random _random = Random(42);
-  late List<double> _baseHeights;
-
-  @override
-  void initState() {
-    super.initState();
-    _baseHeights = List.generate(widget.barCount, (i) {
-      final center = widget.barCount / 2;
-      final dist = (i - center).abs() / center;
-      return (1.0 - dist * 0.55).clamp(0.25, 1.0);
+  const baseHeights = useMemo(() => {
+    return Array.from({ length: barCount }, (_, i) => {
+      const center = barCount / 2;
+      const dist = Math.abs(i - center) / center;
+      const val = 1.0 - dist * 0.55;
+      return Math.min(Math.max(val, 0.25), 1.0);
     });
+  }, [barCount]);
 
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    )..addListener(() {
-        if (widget.isRecording && mounted) {
-          setState(() {});
-        }
-      });
-
-    if (widget.isRecording) {
-      _controller.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void didUpdateWidget(AudioVisualizerWave oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isRecording != oldWidget.isRecording) {
-      if (widget.isRecording) {
-        _controller.repeat(reverse: true);
-      } else {
-        _controller.stop();
-        _controller.reset();
-        setState(() {});
+  useEffect(() => {
+    if (!isRecording) {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
+      startTimeRef.current = null;
+      setTick((t) => t + 1);
+      return;
     }
-  }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+    startTimeRef.current = performance.now();
 
-  @override
-  Widget build(BuildContext context) {
-    final secondary = widget.secondaryColor ?? widget.color.withOpacity(0.7);
+    const animate = (time) => {
+      setTick((t) => t + 1);
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: widget.color.withOpacity(widget.isRecording ? 0.08 : 0.03),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: widget.color.withOpacity(widget.isRecording ? 0.2 : 0.08),
-        ),
-      ),
-      child: SizedBox(
-        height: widget.maxHeight,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: List.generate(widget.barCount, (index) {
-            double factor;
-            if (widget.isRecording) {
-              final wave = sin(_controller.value * 2 * pi + (index * 0.35)).abs();
-              final noise = _random.nextDouble() * 0.35;
-              factor = ((_baseHeights[index] * 0.55) + (wave * 0.4) + noise)
-                  .clamp(0.18, 1.0);
-            } else {
-              factor = 0.14;
-            }
+    animationFrameRef.current = requestAnimationFrame(animate);
 
-            final barHeight =
-                (widget.maxHeight * factor).clamp(5.0, widget.maxHeight);
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isRecording]);
 
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 2.0),
-              width: 3.5,
-              height: barHeight,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: widget.isRecording
-                      ? [widget.color, secondary]
-                      : [
-                          widget.color.withOpacity(0.2),
-                          widget.color.withOpacity(0.1),
-                        ],
-                ),
-                borderRadius: BorderRadius.circular(4),
-                boxShadow: widget.isRecording
-                    ? [
-                        BoxShadow(
-                          color: widget.color.withOpacity(0.25),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        )
-                      ]
-                    : null,
-              ),
+  const getAnimationValue = () => {
+    if (!isRecording || !startTimeRef.current) return 0;
+    const elapsed = performance.now() - startTimeRef.current;
+    const period = 1400;
+    const progress = (elapsed % period) / 700;
+    return progress > 1 ? 2 - progress : progress;
+  };
+
+  const animValue = getAnimationValue();
+  const secondary = secondaryColor || `${color}B3`;
+
+  return (
+    <div
+      style={{
+        padding: '8px 16px',
+        backgroundColor: isRecording ? `${color}14` : `${color}08`,
+        borderRadius: 20,
+        border: `1px solid ${isRecording ? `${color}33` : `${color}14`}`,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        style={{
+          height: maxHeight,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        {Array.from({ length: barCount }, (_, index) => {
+          let factor;
+          if (isRecording) {
+            const wave = Math.abs(Math.sin(animValue * 2 * Math.PI + index * 0.35));
+            const noise = Math.random() * 0.35;
+            factor = Math.min(
+              Math.max(baseHeights[index] * 0.55 + wave * 0.4 + noise, 0.18),
+              1.0
             );
-          }),
-        ),
-      ),
-    );
-  }
+          } else {
+            factor = 0.14;
+          }
+
+          const barHeight = Math.min(Math.max(maxHeight * factor, 5.0), maxHeight);
+
+          return (
+            <div
+              key={index}
+              style={{
+                margin: '0 2px',
+                width: 3.5,
+                height: barHeight,
+                background: isRecording
+                  ? `linear-gradient(to top, ${color}, ${secondary})`
+                  : `linear-gradient(to top, ${color}33, ${color}1A)`,
+                borderRadius: 4,
+                boxShadow: isRecording ? `0 1px 4px ${color}40` : 'none',
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
 }
