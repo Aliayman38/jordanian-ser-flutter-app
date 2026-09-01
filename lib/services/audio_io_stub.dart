@@ -1,10 +1,11 @@
-import 'dart:typed_data';
+export async function readAudioBytes(pathOrBlobUrl) {
+  throw new Error('Platform not supported');
+}
 
-Future<Uint8List?> readAudioBytes(String pathOrBlobUrl) =>
-    throw UnsupportedError('Platform not supported');
+export async function deleteAudioFile(pathOrBlobUrl) {
+  throw new Error('Platform not supported');
+}
 
-Future<void> deleteAudioFile(String pathOrBlobUrl) =>
-    throw UnsupportedError('Platform not supported');
-
-Future<String> getTempAudioPath() =>
-    throw UnsupportedError('Platform not supported');
+export async function getTempAudioPath() {
+  throw new Error('Platform not supported');
+}
