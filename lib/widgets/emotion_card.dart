@@ -1,201 +1,152 @@
-import 'package:flutter/material.dart';
-import '../models/emotion.dart';
+import React, { useState } from 'react';
 
-class EmotionCard extends StatefulWidget {
-  final EmotionData data;
-  final VoidCallback onTap;
+export function EmotionCard({ data, onTap }) {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
 
-  const EmotionCard({super.key, required this.data, required this.onTap});
+  const handleMouseDown = () => {
+    setIsPressed(true);
+  };
 
-  @override
-  State<EmotionCard> createState() => _EmotionCardState();
-}
+  const handleMouseUp = () => {
+    setIsPressed(false);
+    if (onTap) onTap();
+  };
 
-class _EmotionCardState extends State<EmotionCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pressController;
-  late final Animation<double> _scaleAnimation;
-  bool _isHovered = false;
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setIsPressed(false);
+  };
 
-  @override
-  void initState() {
-    super.initState();
-    _pressController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 120),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _pressController, curve: Curves.easeInOut),
-    );
-  }
+  return (
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={handleMouseLeave}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onTouchStart={handleMouseDown}
+      onTouchEnd={handleMouseUp}
+      style={{
+        cursor: 'pointer',
+        userSelect: 'none',
+        transform: `scale(${isPressed ? 0.95 : 1.0}) translateY(${isHovered ? -4 : 0}px)`,
+        transition: 'transform 200ms cubic-bezier(0.215, 0.61, 0.355, 1)',
+        borderRadius: 24,
+        background: `linear-gradient(to bottom right, ${data.color}, ${data.darkColor})`,
+        border: `${isHovered ? '2px' : '1.5px'} solid ${
+          isHovered ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.2)'
+        }`,
+        boxShadow: `0 ${isHovered ? 12 : 8}px ${isHovered ? 24 : 16}px ${
+          data.darkColor
+        }${isHovered ? '80' : '52'}`,
+        position: 'relative',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+        width: '100%',
+        aspectRatio: '1 / 1',
+      }}
+    >
+      {/* Subtle decorative background circle */}
+      <div
+        style={{
+          position: 'absolute',
+          top: -20,
+          right: -20,
+          width: 80,
+          height: 80,
+          borderRadius: '50%',
+          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+          pointerEvents: 'none',
+        }}
+      />
 
-  @override
-  void dispose() {
-    _pressController.dispose();
-    super.dispose();
-  }
+      {/* Prompt count badge positioned at top-right */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          padding: '3px 8px',
+          backgroundColor: 'rgba(0, 0, 0, 0.22)',
+          borderRadius: 10,
+          border: '1px solid rgba(255, 255, 255, 0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 10.5,
+            fontWeight: 700,
+            color: 'rgba(255, 255, 255, 0.95)',
+          }}
+        >
+          {`${data.prompts.length} جمل`}
+        </span>
+      </div>
 
-  void _onTapDown(TapDownDetails _) {
-    _pressController.forward();
-  }
+      {/* Card Main Content (Centered) */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          padding: '22px 10px 10px 10px',
+          boxSizing: 'border-box',
+        }}
+      >
+        {/* Emoji with slight hover scale */}
+        <span
+          style={{
+            fontSize: 40,
+            transform: `scale(${isHovered ? 1.1 : 1.0})`,
+            transition: 'transform 200ms ease',
+            display: 'inline-block',
+          }}
+        >
+          {data.emoji}
+        </span>
 
-  void _onTapUp(TapUpDetails _) {
-    _pressController.reverse();
-    widget.onTap();
-  }
+        <div style={{ height: 6 }} />
 
-  void _onTapCancel() {
-    _pressController.reverse();
-  }
+        {/* Arabic label */}
+        <span
+          style={{
+            fontSize: 19,
+            fontWeight: 900,
+            color: '#FFFFFF',
+            letterSpacing: 0.2,
+            textAlign: 'center',
+            maxWidth: '100%',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {data.labelArabic}
+        </span>
 
-  @override
-  Widget build(BuildContext context) {
-    final data = widget.data;
+        <div style={{ height: 2 }} />
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTapDown: _onTapDown,
-        onTapUp: _onTapUp,
-        onTapCancel: _onTapCancel,
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutCubic,
-            transform: _isHovered
-                ? (Matrix4.identity()..translate(0.0, -4.0, 0.0))
-                : Matrix4.identity(),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  data.color,
-                  data.darkColor,
-                ],
-              ),
-              border: Border.all(
-                color: _isHovered
-                    ? Colors.white.withOpacity(0.45)
-                    : Colors.white.withOpacity(0.2),
-                width: _isHovered ? 2.0 : 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: data.darkColor.withOpacity(_isHovered ? 0.5 : 0.32),
-                  blurRadius: _isHovered ? 24 : 16,
-                  offset: Offset(0, _isHovered ? 12 : 8),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: Stack(
-                children: [
-                  // Subtle decorative background circle
-                  Positioned(
-                    top: -20,
-                    right: -20,
-                    child: Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.08),
-                      ),
-                    ),
-                  ),
-
-                  // Prompt count badge positioned at top-right
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.22),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.25),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        '${data.prompts.length} جمل',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white.withOpacity(0.95),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Card Main Content (Centered)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 22, 10, 10),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Emoji with slight hover scale
-                          AnimatedScale(
-                            duration: const Duration(milliseconds: 200),
-                            scale: _isHovered ? 1.1 : 1.0,
-                            child: Text(
-                              data.emoji,
-                              style: const TextStyle(fontSize: 40),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-
-                          // Arabic label
-                          Text(
-                            data.labelArabic,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-
-                          const SizedBox(height: 2),
-
-                          // Subtitle
-                          Text(
-                            data.subtitleArabic,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.white.withOpacity(0.85),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+        {/* Subtitle */}
+        <span
+          style={{
+            fontSize: 11,
+            color: 'rgba(255, 255, 255, 0.85)',
+            fontWeight: 600,
+            textAlign: 'center',
+            maxWidth: '100%',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {data.subtitleArabic}
+        </span>
+      </div>
+    </div>
+  );
 }
