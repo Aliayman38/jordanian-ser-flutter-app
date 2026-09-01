@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Gender, GenderX } from '../models/speaker';
-import { useAppState } from '../services/app_state';
-import { AppTheme } from '../theme/app_theme';
-import { ResponsiveContainer } from '../widgets/responsive_container';
-import { EmotionsMenuScreen } from './emotions_menu_screen';
+import { Gender, GenderX } from '../models/speaker.js';
+import { useAppState } from '../services/app_state.jsx';
+import { AppTheme } from '../theme/app_theme.js';
+import { ResponsiveContainer } from '../widgets/responsive_container.jsx';
+import { EmotionsMenuScreen } from './emotions_menu_screen.jsx';
 
 function HeaderArt() {
   return (
@@ -177,7 +177,7 @@ export function GenderSelectionScreen({ navigate }) {
 
   const onStart = () => {
     if (navigate) {
-      navigate(<EmotionsMenuScreen />);
+      navigate(<EmotionsMenuScreen navigate={navigate} />);
     }
   };
 
@@ -409,3 +409,5 @@ export function GenderSelectionScreen({ navigate }) {
     </div>
   );
 }
+
+export default GenderSelectionScreen;

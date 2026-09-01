@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { GenderSelectionScreen } from './screens/gender_selection_screen';
-import { AppStateProvider } from './services/app_state';
-import { AppTheme } from './theme/app_theme';
+import { GenderSelectionScreen } from './screens/gender_selection_screen.jsx';
+import { AppStateProvider } from './services/app_state.jsx';
+import { AppTheme } from './theme/app_theme.js';
 
 export function JordanianSERApp() {
   const [currentScreen, setCurrentScreen] = useState(null);
@@ -18,7 +18,7 @@ export function JordanianSERApp() {
         style={{
           minHeight: '100vh',
           backgroundColor: AppTheme.background,
-          fontFamily: AppTheme.theme.fontFamily,
+          fontFamily: AppTheme.theme?.fontFamily || 'Cairo, Tajawal, sans-serif',
           color: AppTheme.textDark,
           margin: 0,
           padding: 0,

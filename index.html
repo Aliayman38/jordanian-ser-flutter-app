@@ -1,50 +1,37 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="تحدي الصوت الأردني - منصة جمع البيانات الصوتية لتدريب نماذج الذكاء الاصطناعي على تمييز المشاعر باللهجة الأردنية" />
-
-  <!-- iOS meta tags & icons -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="تحدي الصوت الأردني" />
-  <meta name="theme-color" content="#006D5B" />
-
-  <title>تحدي الصوت الأردني | Jordanian SER</title>
-  <link rel="manifest" href="/manifest.json" />
-
-  <!-- Material Icons Font for mic/audio controls -->
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
-
-  <!-- Google Fonts: Cairo, Tajawal & Noto Sans Arabic -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;900&family=Noto+Sans+Arabic:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
-
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    html, body, #root {
-      width: 100%;
-      min-height: 100vh;
-      background-color: #F6FAF8;
-      font-family: 'Cairo', 'Tajawal', 'Noto Sans Arabic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    body {
-      overflow-x: hidden;
-    }
-  </style>
-</head>
-<body>
-  <!-- React Mount Point -->
-  <div id="root"></div>
-
-  <!-- React Entry Point -->
-  <script type="module" src="/lib/main.jsx"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#121212" />
+    <title>تسجيل بيانات المشاعر الصوتية</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/icon?family=Material+Icons+Round"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        background-color: #0f172a;
+        color: #f8fafc;
+        overflow-x: hidden;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/lib/main.jsx"></script>
+  </body>
 </html>

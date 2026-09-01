@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { EmotionData } from '../models/emotion';
-import { Gender, GenderX } from '../models/speaker';
-import { useAppState } from '../services/app_state';
-import { AppTheme } from '../theme/app_theme';
-import { EmotionCard } from '../widgets/emotion_card';
-import { ResponsiveContainer } from '../widgets/responsive_container';
-import { RecordingScreen } from './recording_screen';
+import { EmotionData } from '../models/emotion.js';
+import { Gender, GenderX } from '../models/speaker.js';
+import { useAppState } from '../services/app_state.jsx';
+import { AppTheme } from '../theme/app_theme.js';
+import { EmotionCard } from '../widgets/emotion_card.jsx';
+import { ResponsiveContainer } from '../widgets/responsive_container.jsx';
+import { RecordingScreen } from './recording_screen.jsx';
 
 function ChangeGenderDialog({ isOpen, onClose }) {
   const { speakerId, gender, selectGender } = useAppState();
@@ -70,8 +70,14 @@ function ChangeGenderDialog({ isOpen, onClose }) {
                 cursor: 'pointer',
                 fontSize: 14,
                 fontWeight: 600,
+                touchAction: 'manipulation',
               }}
               onClick={() => {
+                selectGender(Gender.male);
+                onClose();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
                 selectGender(Gender.male);
                 onClose();
               }}
@@ -92,8 +98,14 @@ function ChangeGenderDialog({ isOpen, onClose }) {
                 cursor: 'pointer',
                 fontSize: 14,
                 fontWeight: 600,
+                touchAction: 'manipulation',
               }}
               onClick={() => {
+                selectGender(Gender.female);
+                onClose();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
                 selectGender(Gender.female);
                 onClose();
               }}
@@ -119,8 +131,14 @@ function ChangeGenderDialog({ isOpen, onClose }) {
               cursor: 'pointer',
               fontWeight: 700,
               fontSize: 14,
+              padding: 8,
+              touchAction: 'manipulation',
             }}
             onClick={onClose}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              onClose();
+            }}
           >
             إلغاء
           </button>
@@ -351,6 +369,20 @@ export function EmotionsMenuScreen({ navigate }) {
 
   const isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 1024 : false;
 
+  const handleSelectEmotion = (data) => {
+    if (navigate) {
+      navigate(
+        <RecordingScreen
+          emotion={data}
+          navigate={navigate}
+          onBack={() => {
+            navigate(<EmotionsMenuScreen navigate={navigate} />);
+          }}
+        />
+      );
+    }
+  };
+
   return (
     <div
       style={{
@@ -379,6 +411,10 @@ export function EmotionsMenuScreen({ navigate }) {
             type="button"
             title="تغيير المتحدث"
             onClick={() => setDialogOpen(true)}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              setDialogOpen(true);
+            }}
             style={{
               background: 'none',
               border: 'none',
@@ -387,6 +423,7 @@ export function EmotionsMenuScreen({ navigate }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              touchAction: 'manipulation',
             }}
           >
             <span className="material-icons-round" style={{ fontSize: 24 }}>
@@ -452,11 +489,7 @@ export function EmotionsMenuScreen({ navigate }) {
                 <EmotionCard
                   key={data.type}
                   data={data}
-                  onTap={() => {
-                    if (navigate) {
-                      navigate(<RecordingScreen emotion={data} />);
-                    }
-                  }}
+                  onTap={() => handleSelectEmotion(data)}
                 />
               ))}
             </div>
@@ -471,3 +504,5 @@ export function EmotionsMenuScreen({ navigate }) {
     </div>
   );
 }
+
+export default EmotionsMenuScreen;

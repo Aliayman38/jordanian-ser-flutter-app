@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ApiService } from '../services/api_service';
-import { useAppState } from '../services/app_state';
-import { AudioService } from '../services/audio_service';
-import { AppTheme } from '../theme/app_theme';
-import { AudioVisualizerWave } from '../widgets/audio_visualizer_wave';
-import { HoldToRecordButton, RecordingMode } from '../widgets/hold_to_record_button';
-import { ResponsiveContainer } from '../widgets/responsive_container';
+import { ApiService } from '../services/api_service.js';
+import { useAppState } from '../services/app_state.jsx';
+import { AudioService } from '../services/audio_service.js';
+import { AppTheme } from '../theme/app_theme.js';
+import { AudioVisualizerWave } from '../widgets/audio_visualizer_wave.jsx';
+import { HoldToRecordButton, RecordingMode } from '../widgets/hold_to_record_button.jsx';
+import { ResponsiveContainer } from '../widgets/responsive_container.jsx';
 
 const RecordingStage = Object.freeze({
   idle: 'idle',
@@ -21,12 +21,14 @@ function SuccessDialog({ isOpen, onClose, onRecordAgain, onGoToMenu, score }) {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
+        zIndex: 2000,
+        padding: 16,
       }}
+      onClick={onClose}
     >
       <div
         style={{
@@ -35,11 +37,13 @@ function SuccessDialog({ isOpen, onClose, onRecordAgain, onGoToMenu, score }) {
           padding: '28px 24px',
           maxWidth: 460,
           width: '90%',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.2)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           boxSizing: 'border-box',
+          position: 'relative',
+          zIndex: 2001,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -135,8 +139,13 @@ function SuccessDialog({ isOpen, onClose, onRecordAgain, onGoToMenu, score }) {
               gap: 8,
               fontSize: 15.5,
               fontWeight: 'bold',
+              touchAction: 'manipulation',
             }}
             onClick={onRecordAgain}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              onRecordAgain();
+            }}
           >
             <span className="material-icons-round" style={{ fontSize: 20 }}>
               refresh
@@ -151,7 +160,7 @@ function SuccessDialog({ isOpen, onClose, onRecordAgain, onGoToMenu, score }) {
               height: 50,
               backgroundColor: 'transparent',
               color: AppTheme.primary,
-              border: `1px solid ${AppTheme.primary}`,
+              border: `1.5px solid ${AppTheme.primary}`,
               borderRadius: 12,
               cursor: 'pointer',
               display: 'flex',
@@ -159,9 +168,14 @@ function SuccessDialog({ isOpen, onClose, onRecordAgain, onGoToMenu, score }) {
               justifyContent: 'center',
               gap: 8,
               fontSize: 15,
-              fontWeight: 600,
+              fontWeight: 700,
+              touchAction: 'manipulation',
             }}
             onClick={onGoToMenu}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              onGoToMenu();
+            }}
           >
             <span className="material-icons-round" style={{ fontSize: 20 }}>
               grid_view
@@ -230,6 +244,12 @@ function ModeItem({ label, isSelected, onTap }) {
   return (
     <div
       onClick={onTap}
+      onTouchEnd={(e) => {
+        if (onTap) {
+          e.preventDefault();
+          onTap();
+        }
+      }}
       style={{
         cursor: onTap ? 'pointer' : 'default',
         borderRadius: 12,
@@ -237,6 +257,7 @@ function ModeItem({ label, isSelected, onTap }) {
         backgroundColor: isSelected ? AppTheme.primary : 'transparent',
         transition: 'background-color 200ms ease',
         userSelect: 'none',
+        touchAction: 'manipulation',
       }}
     >
       <span
@@ -301,6 +322,7 @@ function PromptCard({
         flexDirection: 'column',
       }}
     >
+      {/* الرأس: تنبيه أن النص مجرد مثال */}
       <div
         style={{
           display: 'flex',
@@ -311,19 +333,19 @@ function PromptCard({
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div
             style={{
-              padding: '4px 8px',
+              padding: '4px 10px',
               backgroundColor: `${emotion.color}2E`,
-              borderRadius: 8,
+              borderRadius: 10,
             }}
           >
             <span
               style={{
-                fontSize: 11.5,
-                fontWeight: 700,
+                fontSize: 12,
+                fontWeight: 800,
                 color: emotion.darkColor,
               }}
             >
-              {`جملة ${promptNumber} من ${totalPrompts}`}
+              مثال للإلهام فقط 💡
             </span>
           </div>
           <div style={{ width: 8 }} />
@@ -342,6 +364,10 @@ function PromptCard({
           <button
             type="button"
             onClick={onShuffle}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              onShuffle();
+            }}
             style={{
               background: 'none',
               border: 'none',
@@ -351,13 +377,14 @@ function PromptCard({
               display: 'flex',
               alignItems: 'center',
               gap: 4,
+              touchAction: 'manipulation',
             }}
           >
             <span className="material-icons-round" style={{ fontSize: 16 }}>
               shuffle
             </span>
             <span style={{ fontSize: 12, fontWeight: 800 }}>
-              {isDesktop ? 'جملة ثانية (R)' : 'جملة ثانية'}
+              {isDesktop ? 'مثال ثاني (R)' : 'مثال ثاني'}
             </span>
           </button>
         )}
@@ -365,80 +392,51 @@ function PromptCard({
 
       <div style={{ height: 12 }} />
 
+      {/* نص المثال المقترح */}
       <div
         key={prompt}
         style={{
           textAlign: 'right',
-          fontSize: 21,
+          fontSize: 20,
           fontWeight: 800,
           lineHeight: 1.55,
           color: AppTheme.textDark,
+          opacity: 0.9,
           transition: 'opacity 250ms ease-in-out',
         }}
       >
-        {prompt}
+        "{prompt}"
       </div>
-    </div>
-  );
-}
 
-function ErrorBanner({ message }) {
-  return (
-    <div
-      style={{
-        width: '100%',
-        boxSizing: 'border-box',
-        padding: 12,
-        backgroundColor: '#fef2f2',
-        borderRadius: 14,
-        border: '1px solid #fecaca',
-        display: 'flex',
-        alignItems: 'center',
-      }}
-    >
-      <span
-        className="material-icons-round"
-        style={{ color: '#dc2626', fontSize: 20 }}
-      >
-        error_outline
-      </span>
-      <div style={{ width: 10 }} />
-      <span style={{ color: '#991b1b', fontSize: 13, flex: 1 }}>{message}</span>
-    </div>
-  );
-}
+      <div style={{ height: 14 }} />
 
-function InfoBanner({ message }) {
-  return (
-    <div
-      style={{
-        width: '100%',
-        boxSizing: 'border-box',
-        padding: 12,
-        backgroundColor: '#fffbeb',
-        borderRadius: 14,
-        border: '1px solid #fcd34d',
-        display: 'flex',
-        alignItems: 'center',
-      }}
-    >
-      <span
-        className="material-icons-round"
-        style={{ color: '#92400e', fontSize: 20 }}
-      >
-        info_outline
-      </span>
-      <div style={{ width: 10 }} />
-      <span
+      {/* صندوق التوضيح لتدريب الـ AI */}
+      <div
         style={{
-          color: '#78350f',
-          fontSize: 13,
-          fontWeight: 600,
-          flex: 1,
+          padding: '10px 14px',
+          backgroundColor: '#ffffff',
+          borderRadius: 14,
+          border: `1.5px dashed ${emotion.color}66`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
         }}
       >
-        {message}
-      </span>
+        <span
+          className="material-icons-round"
+          style={{ fontSize: 22, color: emotion.darkColor, flexShrink: 0 }}
+        >
+          record_voice_over
+        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right' }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: AppTheme.textDark }}>
+            احكي أي جملة عفوية من عندك! 🇯🇴
+          </span>
+          <span style={{ fontSize: 11.5, color: AppTheme.textMuted, fontWeight: 600, marginTop: 2 }}>
+            المثال اللي فوق مجرد فكرة.. عشان ندرب الذكاء الاصطناعي بدنا كلام عفوي وطبيعي تماماً بنفس الشعور.
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -459,7 +457,7 @@ export function RecordingScreen({ emotion, onBack }) {
   const _apiService = apiServiceRef.current;
 
   const [promptIndex, setPromptIndex] = useState(() =>
-    Math.floor(Math.random() * emotion.prompts.length)
+    Math.floor(Math.random() * (emotion?.prompts?.length || 1))
   );
   const [stage, setStage] = useState(RecordingStage.idle);
   const [recordingMode, setRecordingMode] = useState(RecordingMode.hold);
@@ -470,6 +468,7 @@ export function RecordingScreen({ emotion, onBack }) {
 
   const timerRef = useRef(null);
   const recordStartTimeRef = useRef(null);
+  const isRecordingRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -478,11 +477,11 @@ export function RecordingScreen({ emotion, onBack }) {
     };
   }, [_audioService]);
 
-  const currentPrompt = emotion.promptFor(promptIndex);
+  const currentPrompt = emotion?.promptFor ? emotion.promptFor(promptIndex) : (emotion?.prompts?.[promptIndex] || '');
 
   const shufflePrompt = () => {
     if (stage === RecordingStage.recording || stage === RecordingStage.uploading) return;
-    setPromptIndex((prev) => (prev + 1) % emotion.prompts.length);
+    setPromptIndex((prev) => (prev + 1) % (emotion?.prompts?.length || 1));
     setLastError(null);
     setInfoTip(null);
   };
@@ -511,59 +510,75 @@ export function RecordingScreen({ emotion, onBack }) {
   })();
 
   const startRecording = async () => {
+    if (isRecordingRef.current || stage === RecordingStage.recording || stage === RecordingStage.uploading) return;
+    
     setLastError(null);
     setInfoTip(null);
+    isRecordingRef.current = true;
     setStage(RecordingStage.recording);
     startTimer();
 
     try {
       await _audioService.startRecording();
     } catch (e) {
+      console.error('startRecording failed:', e);
+      isRecordingRef.current = false;
       stopTimer();
       setStage(RecordingStage.idle);
-      setLastError(e.toString());
+      setLastError(e.message || e.toString());
     }
   };
 
   const stopRecordingAndUpload = async () => {
-    if (stage !== RecordingStage.recording) return;
+    if (!isRecordingRef.current && stage !== RecordingStage.recording) return;
+    isRecordingRef.current = false;
     stopTimer();
 
-    const recordDurationMs = elapsedMilliseconds;
+    const recordDurationMs = Date.now() - (recordStartTimeRef.current || Date.now());
 
-    if (recordDurationMs < 1000) {
+    if (recordDurationMs < 800) {
       await _audioService.stopRecording();
       setStage(RecordingStage.idle);
-      setInfoTip(
-        'التسجيل قصير جداً (أقل من ثانية). يرجى التحدث بوضوح وإعادة المحاولة.'
-      );
+      setInfoTip('التسجيل قصير جداً (أقل من ثانية). يرجى الضغط والتحدث بوضوح.');
       return;
     }
 
     setStage(RecordingStage.uploading);
 
-    const audioData = await _audioService.stopRecording();
-    if (!audioData || audioData.isEmpty) {
+    try {
+      const audioData = await _audioService.stopRecording();
+      if (!audioData || audioData.isEmpty) {
+        setStage(RecordingStage.idle);
+        setLastError('ما تم تسجيل الصوت، جرب مرة ثانية.');
+        return;
+      }
+
+      const result = await _apiService.submitAudio({
+        audioData,
+        speakerId: appState.speakerId,
+        emotionTag: emotion.apiTag,
+        referenceText: '',
+      });
+
+      if (result.success) {
+        appState.incrementScore();
+        setStage(RecordingStage.idle);
+        setElapsedMilliseconds(0);
+        setSuccessDialogOpen(true);
+      } else {
+        setStage(RecordingStage.idle);
+        setLastError(result.errorMessage || 'صار خطأ غير متوقع في رفع الصوت.');
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
       setStage(RecordingStage.idle);
-      setLastError('ما انسجل الصوت، جرب مرة ثانية.');
-      return;
+      setLastError('حدث خطأ أثناء رفع الصوت.');
     }
+  };
 
-    const result = await _apiService.submitAudio({
-      audioData,
-      speakerId: appState.speakerId,
-      emotionTag: emotion.apiTag,
-      referenceText: currentPrompt,
-    });
-
-    if (result.success) {
-      appState.incrementScore();
-      setStage(RecordingStage.idle);
-      setElapsedMilliseconds(0);
-      setSuccessDialogOpen(true);
-    } else {
-      setStage(RecordingStage.idle);
-      setLastError(result.errorMessage || 'صار خطأ غير متوقع في رفع الصوت.');
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
     }
   };
 
@@ -576,31 +591,27 @@ export function RecordingScreen({ emotion, onBack }) {
         } else if (stage === RecordingStage.recording) {
           stopRecordingAndUpload();
         }
-      } else if (event.key === 'r' || event.key === 'R' || event.key === 'n' || event.key === 'N') {
+      } else if (event.key === 'r' || event.key === 'R') {
         shufflePrompt();
       } else if (event.key === 'Escape') {
-        if (onBack) onBack();
+        handleBack();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [stage, elapsedMilliseconds, promptIndex, emotion]);
+  }, [stage, emotion]);
 
   const getStatusText = () => {
     switch (stage) {
-      case RecordingStage.idle:
-        return recordingMode === RecordingMode.hold
-          ? 'اضغط واستمر بالضغط على المايك للتسجيل'
-          : 'اضغط على المايك للبدء، واضغط مرة أخرى للإيقاف';
       case RecordingStage.recording:
-        return recordingMode === RecordingMode.hold
-          ? '🎙️ جاري التسجيل... ارفع إصبعك للإرسال'
-          : '🎙️ جاري التسجيل... اضغط لإيقاف التسجيل والإرسال';
+        return '🎙️ جاري التسجيل... ارفع يدك للإرسال أو اضغط زر المسافة (Space)';
       case RecordingStage.uploading:
         return '🚀 جاري رفع المقطع الصوتي ومعالجته...';
       default:
-        return '';
+        return recordingMode === RecordingMode.hold
+          ? 'اضغط واستمر بالضغط على المايك للتسجيل'
+          : 'اضغط على المايك للبدء، واضغط مرة أخرى للإيقاف';
     }
   };
 
@@ -609,13 +620,7 @@ export function RecordingScreen({ emotion, onBack }) {
   const isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 1024 : false;
 
   const promptSection = (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        width: '100%',
-      }}
-    >
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       <RecordingModeSelector
         currentMode={recordingMode}
         isBusy={isRecording || isUploading}
@@ -629,7 +634,7 @@ export function RecordingScreen({ emotion, onBack }) {
         emotion={emotion}
         onShuffle={isRecording || isUploading ? null : shufflePrompt}
         promptNumber={promptIndex + 1}
-        totalPrompts={emotion.prompts.length}
+        totalPrompts={emotion?.prompts?.length || 1}
         isDesktop={isDesktop}
       />
 
@@ -660,14 +665,7 @@ export function RecordingScreen({ emotion, onBack }) {
   );
 
   const recordingControlsSection = (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
       {isRecording && (
         <>
           <div
@@ -706,8 +704,8 @@ export function RecordingScreen({ emotion, onBack }) {
 
       <AudioVisualizerWave
         isRecording={isRecording}
-        color={emotion.color}
-        secondaryColor={emotion.darkColor}
+        color={emotion?.color || '#E63946'}
+        secondaryColor={emotion?.darkColor || '#991B1B'}
       />
 
       <div style={{ height: 18 }} />
@@ -728,7 +726,7 @@ export function RecordingScreen({ emotion, onBack }) {
         </div>
       ) : (
         <HoldToRecordButton
-          color={emotion.color}
+          color={emotion?.color || '#E63946'}
           isRecording={isRecording}
           isBusy={isUploading}
           mode={recordingMode}
@@ -770,13 +768,42 @@ export function RecordingScreen({ emotion, onBack }) {
           height: 56,
           backgroundColor: '#ffffff',
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          position: 'relative',
+          zIndex: 100,
         }}
       >
+        <button
+          type="button"
+          onClick={handleBack}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            handleBack();
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          title="رجوع"
+        >
+          <span className="material-icons-round" style={{ fontSize: 26, color: AppTheme.textDark }}>
+            arrow_forward
+          </span>
+        </button>
+
         <div style={{ display: 'flex', alignItems: 'center', margin: '0 auto' }}>
-          <span style={{ fontSize: 22 }}>{emotion.emoji}</span>
+          <span style={{ fontSize: 22 }}>{emotion?.emoji}</span>
           <div style={{ width: 8 }} />
-          <span style={{ fontWeight: 900, fontSize: 18 }}>{emotion.labelArabic}</span>
+          <span style={{ fontWeight: 900, fontSize: 18 }}>{emotion?.labelArabic}</span>
         </div>
+
+        <div style={{ width: 48 }} />
       </header>
 
       <ResponsiveContainer
@@ -820,10 +847,12 @@ export function RecordingScreen({ emotion, onBack }) {
         }}
         onGoToMenu={() => {
           setSuccessDialogOpen(false);
-          if (onBack) onBack();
+          handleBack();
         }}
         score={appState.score}
       />
     </div>
   );
 }
+
+export default RecordingScreen;
