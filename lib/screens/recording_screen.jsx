@@ -188,6 +188,195 @@ function SuccessDialog({ isOpen, onClose, onRecordAgain, onGoToMenu, score }) {
   );
 }
 
+function ErrorBanner({ error, onDismiss, onRetry }) {
+  if (!error) return null;
+  const message = typeof error === 'string' ? error : (error.message || 'حدث خطأ غير متوقع');
+  const actionHint = typeof error === 'object' ? error.actionHint : null;
+  const isAppleIssue = typeof error === 'object' && (error.code === 'PERMISSION_DENIED' || error.code === 'INSECURE_CONTEXT');
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: '14px 16px',
+        backgroundColor: '#fef2f2',
+        border: '1.5px solid #f87171',
+        borderRadius: 16,
+        boxShadow: '0 4px 14px rgba(239, 68, 68, 0.12)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        textAlign: 'right',
+        animation: 'fadeIn 0.25s ease-out',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              backgroundColor: '#fee2e2',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <span className="material-icons-round" style={{ fontSize: 20, color: '#dc2626' }}>
+              error_outline
+            </span>
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#991b1b', lineHeight: 1.4 }}>
+              {message}
+            </div>
+            {actionHint && (
+              <div
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: '#b91c1c',
+                  marginTop: 6,
+                  lineHeight: 1.5,
+                  backgroundColor: '#ffffff',
+                  padding: '8px 12px',
+                  borderRadius: 10,
+                  border: '1px solid #fecaca',
+                }}
+              >
+                💡 {actionHint}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {onDismiss && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 4,
+              color: '#991b1b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="إغلاق"
+          >
+            <span className="material-icons-round" style={{ fontSize: 18 }}>
+              close
+            </span>
+          </button>
+        )}
+      </div>
+
+      {isAppleIssue && (
+        <div
+          style={{
+            backgroundColor: '#fff1f2',
+            padding: '8px 12px',
+            borderRadius: 10,
+            border: '1px dashed #f43f5e',
+            fontSize: 12,
+            color: '#881337',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span style={{ fontSize: 16 }}>🍎</span>
+          <span><strong>لمستخدمي أجهزة Apple:</strong> تأكد من فتح الرابط عبر متصفح Safari وليس متصفح مصغر، وتأكد من رابط HTTPS.</span>
+        </div>
+      )}
+
+      {onRetry && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
+          <button
+            type="button"
+            onClick={onRetry}
+            style={{
+              padding: '6px 14px',
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span className="material-icons-round" style={{ fontSize: 16 }}>
+              refresh
+            </span>
+            <span>إعادة المحاولة</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InfoBanner({ message, onDismiss }) {
+  if (!message) return null;
+  return (
+    <div
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: '12px 14px',
+        backgroundColor: '#eff6ff',
+        border: '1.5px solid #93c5fd',
+        borderRadius: 14,
+        boxShadow: '0 3px 10px rgba(59, 130, 246, 0.08)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        textAlign: 'right',
+        animation: 'fadeIn 0.25s ease-out',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="material-icons-round" style={{ fontSize: 20, color: '#2563eb' }}>
+          info
+        </span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#1e40af', lineHeight: 1.4 }}>
+          {message}
+        </span>
+      </div>
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 4,
+            color: '#2563eb',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+          title="إغلاق"
+        >
+          <span className="material-icons-round" style={{ fontSize: 18 }}>
+            close
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Shortcut({ keyLabel, actionLabel }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -512,6 +701,9 @@ export function RecordingScreen({ emotion, onBack }) {
   const startRecording = async () => {
     if (isRecordingRef.current || stage === RecordingStage.recording || stage === RecordingStage.uploading) return;
     
+    // تنشيط AudioContext مباشرة على حركة اللمس لدعم قيود Safari التلقائية
+    _audioService.unlockAudioContext();
+
     setLastError(null);
     setInfoTip(null);
     isRecordingRef.current = true;
@@ -525,7 +717,11 @@ export function RecordingScreen({ emotion, onBack }) {
       isRecordingRef.current = false;
       stopTimer();
       setStage(RecordingStage.idle);
-      setLastError(e.message || e.toString());
+      setLastError({
+        message: e.message || 'تعذر تشغيل الميكروفون',
+        actionHint: e.actionHint || '',
+        code: e.code || '',
+      });
     }
   };
 
@@ -537,9 +733,9 @@ export function RecordingScreen({ emotion, onBack }) {
     const recordDurationMs = Date.now() - (recordStartTimeRef.current || Date.now());
 
     if (recordDurationMs < 800) {
-      await _audioService.stopRecording();
+      await _audioService.stopRecording().catch(() => {});
       setStage(RecordingStage.idle);
-      setInfoTip('التسجيل قصير جداً (أقل من ثانية). يرجى الضغط والتحدث بوضوح.');
+      setInfoTip('التسجيل قصير جداً (أقل من ثانية). يرجى الاستمرار بالضغط والتحدث بوضوح.');
       return;
     }
 
@@ -549,7 +745,11 @@ export function RecordingScreen({ emotion, onBack }) {
       const audioData = await _audioService.stopRecording();
       if (!audioData || audioData.isEmpty) {
         setStage(RecordingStage.idle);
-        setLastError('ما تم تسجيل الصوت، جرب مرة ثانية.');
+        setLastError({
+          message: 'لم يتم التقاط أي صوت، تأكد من أن الميكروفون يعمل وحاول مجدداً.',
+          actionHint: 'تأكد من عدم كتم الصوت وتحدث بوضوح قرب المايك.',
+          code: 'EMPTY_AUDIO',
+        });
         return;
       }
 
@@ -567,12 +767,20 @@ export function RecordingScreen({ emotion, onBack }) {
         setSuccessDialogOpen(true);
       } else {
         setStage(RecordingStage.idle);
-        setLastError(result.errorMessage || 'صار خطأ غير متوقع في رفع الصوت.');
+        setLastError({
+          message: result.errorMessage || 'صار خطأ غير متوقع في رفع الصوت.',
+          actionHint: 'تأكد من اتصال الإنترنت وعمل السيرفر.',
+          code: 'UPLOAD_FAILED',
+        });
       }
     } catch (err) {
       console.error('Upload error:', err);
       setStage(RecordingStage.idle);
-      setLastError('حدث خطأ أثناء رفع الصوت.');
+      setLastError({
+        message: err.message || 'حدث خطأ أثناء معالجة ورفع الصوت.',
+        actionHint: err.actionHint || 'حاول تسجيل المقطع مرة أخرى.',
+        code: err.code || 'PROCESS_ERROR',
+      });
     }
   };
 
@@ -641,14 +849,21 @@ export function RecordingScreen({ emotion, onBack }) {
       {lastError && (
         <>
           <div style={{ height: 12 }} />
-          <ErrorBanner message={lastError} />
+          <ErrorBanner
+            error={lastError}
+            onDismiss={() => setLastError(null)}
+            onRetry={startRecording}
+          />
         </>
       )}
 
       {infoTip && (
         <>
           <div style={{ height: 12 }} />
-          <InfoBanner message={infoTip} />
+          <InfoBanner
+            message={infoTip}
+            onDismiss={() => setInfoTip(null)}
+          />
         </>
       )}
 

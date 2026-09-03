@@ -20,15 +20,13 @@ export function HoldToRecordButton({
   const handlePointerDown = (e) => {
     if (isBusy) return;
     if (mode === RecordingMode.hold) {
-      // منع التمرير وفتح قوائم المتصفح على الموبايل
       if (e.cancelable) e.preventDefault();
       e.stopPropagation();
 
       isHandlingRef.current = true;
       setIsPressed(true);
 
-      // التقاط حركة الإصبع حتى لو تحرك خارج حدود الزر
-      if (e.target && e.target.setPointerCapture && e.pointerId) {
+      if (e.target && e.target.setPointerCapture && e.pointerId !== undefined) {
         try {
           e.target.setPointerCapture(e.pointerId);
         } catch (err) {}
@@ -48,12 +46,37 @@ export function HoldToRecordButton({
       isHandlingRef.current = false;
       setIsPressed(false);
 
-      if (e.target && e.target.releasePointerCapture && e.pointerId) {
+      if (e.target && e.target.releasePointerCapture && e.pointerId !== undefined) {
         try {
           e.target.releasePointerCapture(e.pointerId);
         } catch (err) {}
       }
 
+      if (onRecordStop) onRecordStop();
+    }
+  };
+
+  // معالجة بديلة إضافية لـ iOS Safari في حال تعطل PointerEvents
+  const handleTouchStart = (e) => {
+    if (isBusy) return;
+    if (mode === RecordingMode.hold) {
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
+      if (!isHandlingRef.current) {
+        isHandlingRef.current = true;
+        setIsPressed(true);
+        if (onRecordStart) onRecordStart();
+      }
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (isBusy) return;
+    if (mode === RecordingMode.hold && isHandlingRef.current) {
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
+      isHandlingRef.current = false;
+      setIsPressed(false);
       if (onRecordStop) onRecordStop();
     }
   };
@@ -80,7 +103,8 @@ export function HoldToRecordButton({
         justifyContent: 'center',
         userSelect: 'none',
         WebkitUserSelect: 'none',
-        touchAction: 'none', // تعطيل التمرير التلقائي أثناء الضغط
+        WebkitTouchCallout: 'none',
+        touchAction: 'none',
       }}
     >
       <button
@@ -88,8 +112,14 @@ export function HoldToRecordButton({
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         onClick={handleClick}
-        onContextMenu={(e) => e.preventDefault()}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          return false;
+        }}
         disabled={isBusy}
         style={{
           width: 86,
@@ -109,6 +139,8 @@ export function HoldToRecordButton({
           transition: 'transform 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease',
           touchAction: 'none',
           WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
         }}
       >
         <span
