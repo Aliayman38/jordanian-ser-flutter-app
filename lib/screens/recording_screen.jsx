@@ -658,10 +658,31 @@ export function RecordingScreen({ emotion, onBack }) {
   const timerRef = useRef(null);
   const recordStartTimeRef = useRef(null);
   const isRecordingRef = useRef(false);
+  const wakeLockRef = useRef(null);
+
+  const MAX_RECORDING_MS = 25000; // حد أقصى للأمان: 25 ثانية
+
+  const acquireWakeLock = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+      }
+    } catch (e) {}
+  };
+
+  const releaseWakeLock = async () => {
+    try {
+      if (wakeLockRef.current) {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      }
+    } catch (e) {}
+  };
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      releaseWakeLock();
       _audioService.dispose();
     };
   }, [_audioService]);
@@ -680,7 +701,11 @@ export function RecordingScreen({ emotion, onBack }) {
     recordStartTimeRef.current = Date.now();
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      setElapsedMilliseconds(Date.now() - recordStartTimeRef.current);
+      const elapsed = Date.now() - recordStartTimeRef.current;
+      setElapsedMilliseconds(elapsed);
+      if (elapsed >= MAX_RECORDING_MS) {
+        stopRecordingAndUpload();
+      }
     }, 100);
   };
 
@@ -711,9 +736,14 @@ export function RecordingScreen({ emotion, onBack }) {
     startTimer();
 
     try {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(35); } catch (e) {}
+      }
+      acquireWakeLock();
       await _audioService.startRecording();
     } catch (e) {
       console.error('startRecording failed:', e);
+      releaseWakeLock();
       isRecordingRef.current = false;
       stopTimer();
       setStage(RecordingStage.idle);
@@ -729,6 +759,7 @@ export function RecordingScreen({ emotion, onBack }) {
     if (!isRecordingRef.current && stage !== RecordingStage.recording) return;
     isRecordingRef.current = false;
     stopTimer();
+    releaseWakeLock();
 
     const recordDurationMs = Date.now() - (recordStartTimeRef.current || Date.now());
 
@@ -753,14 +784,21 @@ export function RecordingScreen({ emotion, onBack }) {
         return;
       }
 
+      const promptText = (typeof currentPrompt === 'string' && currentPrompt.trim().length > 0)
+        ? currentPrompt.trim()
+        : (emotion?.labelArabic || 'تسجيل صوتي');
+
       const result = await _apiService.submitAudio({
         audioData,
         speakerId: appState.speakerId,
         emotionTag: emotion.apiTag,
-        referenceText: '',
+        referenceText: promptText,
       });
 
       if (result.success) {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try { navigator.vibrate([40, 60, 40]); } catch (e) {}
+        }
         appState.incrementScore();
         setStage(RecordingStage.idle);
         setElapsedMilliseconds(0);

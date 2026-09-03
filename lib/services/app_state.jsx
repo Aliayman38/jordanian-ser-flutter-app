@@ -1,14 +1,35 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
-import { Gender } from '../models/speaker';
+import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import { Gender } from '../models/speaker.js';
 
 const AppStateContext = createContext(null);
 
 export function AppStateProvider({ children }) {
-  const [gender, setGender] = useState(null);
-  const [score, setScore] = useState(0);
+  const [gender, setGender] = useState(() => {
+    try {
+      return localStorage.getItem('ser_gender') || null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  const [score, setScore] = useState(() => {
+    try {
+      return parseInt(localStorage.getItem('ser_score') || '0', 10) || 0;
+    } catch (e) {
+      return 0;
+    }
+  });
 
   const sessionSuffix = useMemo(() => {
-    return 1000 + Math.floor(Math.random() * 9000);
+    try {
+      const saved = localStorage.getItem('ser_session_suffix');
+      if (saved) return saved;
+      const gen = String(1000 + Math.floor(Math.random() * 9000));
+      localStorage.setItem('ser_session_suffix', gen);
+      return gen;
+    } catch (e) {
+      return String(1000 + Math.floor(Math.random() * 9000));
+    }
   }, []);
 
   const hasSelectedGender = gender !== null;
@@ -20,15 +41,32 @@ export function AppStateProvider({ children }) {
 
   const selectGender = (newGender) => {
     setGender(newGender);
+    try {
+      if (newGender) {
+        localStorage.setItem('ser_gender', newGender);
+      } else {
+        localStorage.removeItem('ser_gender');
+      }
+    } catch (e) {}
   };
 
   const incrementScore = () => {
-    setScore((prevScore) => prevScore + 1);
+    setScore((prevScore) => {
+      const next = prevScore + 1;
+      try {
+        localStorage.setItem('ser_score', String(next));
+      } catch (e) {}
+      return next;
+    });
   };
 
   const reset = () => {
     setGender(null);
     setScore(0);
+    try {
+      localStorage.removeItem('ser_gender');
+      localStorage.removeItem('ser_score');
+    } catch (e) {}
   };
 
   const value = {
@@ -55,3 +93,6 @@ export function useAppState() {
   }
   return context;
 }
+
+export default AppStateProvider;
+
